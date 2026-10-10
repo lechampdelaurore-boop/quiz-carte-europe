@@ -32,6 +32,7 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .primary-button { display: inline-flex; justify-content: space-between; align-items: center; gap: 16px; border: 1px solid var(--teal); border-radius: 5px; background: var(--teal); color: white; padding: 10px 14px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .primary-button:hover { background: #104f47; }
 .primary-button span { font-size: 17px; font-weight: 400; }
+.random-button { flex: none; width: 100%; min-height: 43px; }
 
 .game-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; }
 .map-card, .progress-card, .quiz-card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 25px #19342d08; }
@@ -45,7 +46,7 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .map-instruction { flex: none; color: var(--muted); font-size: 11px; line-height: 1.3; margin: 5px 18px 9px; }
 .map-viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sea); cursor: grab; touch-action: none; }
 .map-viewport.dragging { cursor: grabbing; }
-.map-viewport svg { position: absolute; display: block; height: auto; background: var(--sea); touch-action: none; user-select: none; }
+.map-viewport svg { position: absolute; display: block; height: auto; overflow: visible; touch-action: none; user-select: none; }
 .context-country { fill: #d6ded7; stroke: #aebdb7; stroke-width: 1; vector-effect: non-scaling-stroke; fill-rule: evenodd; }
 .country { fill: var(--land); stroke: #718985; stroke-width: 1.3; vector-effect: non-scaling-stroke; fill-rule: evenodd; cursor: pointer; transition: fill .18s, stroke .18s; }
 .country:hover, .country:focus { fill: #eec393; stroke: #244d47; stroke-width: 2.3; }
@@ -122,6 +123,7 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
   .map-card { height: min(68dvh, 610px); min-height: 360px; }
   .side-column { display: contents; }
   .progress-card { order: 2; }
+  .random-button { order: 1; }
   .quiz-card { order: 3; min-height: 200px; overflow: visible; }
   .question-preview { display: block; }
   .footnote { margin: 10px 2px 18px; }
