@@ -22,6 +22,8 @@
   const freeAnswerInput = document.getElementById('free-answer-input');
   const freeAnswerSubmit = document.getElementById('free-answer-submit');
   const settingsDialog = document.getElementById('settings-dialog');
+  const resultDialog = document.getElementById('result-dialog');
+  const resultAdvance = document.getElementById('result-advance');
   const nodes = new Map();
   let selectedId = null;
   let answered = false;
@@ -376,7 +378,15 @@
     freeAnswerSubmit.disabled = true;
     nextButton.hidden = false;
     updateUI();
-    nextButton.focus();
+    resultDialog.dataset.result = correct ? 'good' : 'bad';
+    document.getElementById('result-icon').textContent = correct ? '✓' : '×';
+    document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
+    document.getElementById('result-title').textContent = correct ? 'Bravo !' : 'À réviser !';
+    document.getElementById('result-detail').textContent = correct
+      ? `Tu as reconnu ${country.name}.`
+      : `La bonne réponse était ${country.name}.`;
+    resultDialog.showModal();
+    resultAdvance.focus();
   }
 
   function closeQuestion() {
@@ -387,6 +397,12 @@
     feedback.className = 'feedback';
     updateUI();
     if (previousFocus?.isConnected) previousFocus.focus();
+  }
+
+  function nextQuestion() {
+    if (resultDialog.open) resultDialog.close();
+    closeQuestion();
+    randomQuestion();
   }
 
   function randomQuestion() {
@@ -499,9 +515,15 @@
     submitAnswer(matchTypedCountry(enteredText), enteredText);
   });
   document.getElementById('close-modal').addEventListener('click', closeQuestion);
-  nextButton.addEventListener('click', () => { closeQuestion(); randomQuestion(); });
+  nextButton.addEventListener('click', nextQuestion);
+  resultAdvance.addEventListener('click', nextQuestion);
+  resultDialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    resultDialog.close();
+    nextButton.focus();
+  });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !settingsDialog.open && !question.hidden) closeQuestion();
+    if (event.key === 'Escape' && !settingsDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
