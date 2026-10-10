@@ -17,8 +17,9 @@
         <div class="intro-copy">
           <span class="eyebrow">GÉOGRAPHIE · EUROPE</span>
           <h1 id="main-title">L'Europe, <em>pays par pays.</em></h1>
-          <p>Clique sur un pays et retrouve son nom parmi six propositions.</p>
+          <p>Clique sur un pays et retrouve son nom.</p>
         </div>
+        <button class="settings-toggle" id="settings-button" type="button" aria-label="Ouvrir les réglages"><span aria-hidden="true">⚙</span><span class="settings-label">Réglages</span></button>
       </section>
 
       <section class="game-layout" aria-label="Jeu de géographie">
@@ -50,7 +51,7 @@
 
           <section class="quiz-card" id="quiz-panel" aria-label="Quiz de géographie">
             <label class="auto-zoom"><input id="auto-zoom" type="checkbox" checked> Zoom automatique sur le pays</label>
-            <div class="quiz-empty" id="quiz-empty"><span class="section-kicker">03 / LE QUIZ</span><h2>À toi de jouer</h2><p>Sélectionne un pays sur la carte pour afficher les six propositions ici.</p></div>
+            <div class="quiz-empty" id="quiz-empty"><span class="section-kicker">03 / LE QUIZ</span><h2>À toi de jouer</h2><p id="quiz-empty-hint">Sélectionne un pays sur la carte pour afficher les six propositions ici.</p></div>
             <div class="quiz-dialog" id="quiz-question" hidden>
               <button class="close-button" id="close-modal" type="button" aria-label="Fermer la question">×</button>
               <span class="section-kicker">03 / DÉFI GÉOGRAPHIE <span id="question-number"></span></span>
@@ -58,6 +59,11 @@
               <p id="quiz-hint">Le pays sélectionné est surligné sur la carte.</p>
               <div class="question-preview" aria-label="Aperçu de la zone sélectionnée"><svg id="mini-map" role="img" aria-label="Le pays à identifier est coloré en orange"></svg></div>
               <div class="answers" id="answers"></div>
+              <form class="free-answer" id="free-answer-form" hidden>
+                <label for="free-answer-input">Nom du pays</label>
+                <div class="free-answer-row"><input id="free-answer-input" name="country" type="text" maxlength="80" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Écris le nom du pays" required><button class="primary-button" id="free-answer-submit" type="submit">Valider</button></div>
+                <p>Accents, tirets et petites fautes de frappe sont tolérés.</p>
+              </form>
               <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
               <button class="primary-button next-button" id="next-button" type="button" hidden>Un autre pays <span aria-hidden="true">↗</span></button>
             </div>
@@ -67,5 +73,20 @@
       <p class="footnote">Les frontières et la définition de l’Europe peuvent varier selon les sources. Les pays transcontinentaux et le Kosovo sont inclus dans ce jeu.</p>
     </main>
   </div>
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-head"><div><span class="section-kicker">PERSONNALISER LE JEU</span><h2 id="settings-title">Réglages</h2></div><button class="settings-close" id="settings-close" type="button" aria-label="Fermer les réglages">×</button></div>
+    <fieldset>
+      <legend>Comment répondre ?</legend>
+      <label class="setting-option"><input type="radio" name="answer-mode" value="qcm" checked><span><strong>QCM</strong><small>Choisis parmi six pays.</small></span></label>
+      <label class="setting-option"><input type="radio" name="answer-mode" value="open"><span><strong>Réponse libre</strong><small>Écris le nom du pays.</small></span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Quels pays tirer au hasard ?</legend>
+      <label class="setting-option"><input type="radio" name="country-selection" value="discover" checked><span><strong>Découverte</strong><small>Pays pas encore trouvés en priorité.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les 51 pays.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays déjà ratés, avec priorité aux plus difficiles.</small></span></label>
+    </fieldset>
+    <p class="settings-note" id="settings-note">Les réglages s'appliquent à la prochaine question. Tu peux toujours cliquer directement sur un pays de la carte.</p>
+  </dialog>
 </body>
 </html>
