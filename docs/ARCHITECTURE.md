@@ -8,10 +8,11 @@ Application statique sans framework ni serveur applicatif. `index.html` charge `
 
 - `width` et `height` : dimensions du repère SVG ;
 - `countries` : 51 objets `{ id, name, d }`, avec le code pays, le nom français et le tracé SVG ;
-- `context` : tracés neutres des pays voisins ;
+- `context` : tracés neutres des terres autour de l'Europe, y compris sous les pays jouables ;
+- `contextExtent` : limites projetées du fond, utilisées pour borner le glissement ;
 - `pins` : coordonnées de huit petits pays pour créer des cibles tactiles plus larges.
 
-Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` télécharge une révision épinglée, retient une liste explicite de 51 pays, projette les coordonnées en Mercator et écrit `map-data.js`. Les pays extérieurs à la liste servent seulement de contexte. Si le périmètre géographique change, modifier la liste des noms et éventuellement les points dans ce script, puis régénérer la carte.
+Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` télécharge une révision épinglée, retient une liste explicite de 51 pays, projette les coordonnées en Mercator et écrit `map-data.js`. Les réponses restent limitées à l'Europe ; le fond couvre une région plus large (longitude −80° à 120°, latitude 0° à 85°) pour éviter une coupure visible au dézoom. Si le périmètre géographique change, modifier la liste des noms et éventuellement les points dans ce script, puis régénérer la carte.
 
 ## Cycle d'une question
 
@@ -42,9 +43,9 @@ Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; da
 
 Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Les couleurs de correction s'accompagnent d'un texte explicite.
 
-Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
+Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Le bouton de tirage au hasard se trouve entre « Mon atlas » et le quiz. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
 
-Le SVG de la carte est positionné dans un conteneur fixe. `renderMap` applique le zoom et le déplacement `panX/panY` ; le niveau initial ajuste la carte à la hauteur disponible. Le glissement à la souris ou au doigt déplace la carte, et un seuil de cinq pixels distingue ce geste d'un clic sur un pays. La molette, les boutons +/− et le pincement à deux doigts modifient le zoom autour du pointeur ou du centre des doigts.
+Le SVG de la carte est positionné dans un conteneur fixe, avec `overflow: visible` pour laisser apparaître les tracés situés hors du repère initial de l'Europe. `renderMap` applique le zoom et le déplacement `panX/panY` ; le niveau initial ajuste la carte à la hauteur disponible et le zoom minimal est 0,85. Le déplacement est borné par `contextExtent` pour ne pas exposer les bords du fond. Le glissement à la souris ou au doigt déplace la carte, et un seuil de cinq pixels distingue ce geste d'un clic sur un pays. La molette, les boutons +/− et le pincement à deux doigts modifient le zoom autour du pointeur ou du centre des doigts.
 
 La case **Zoom automatique sur le pays** est cochée par défaut. `focusCountry` utilise le centre du tracé SVG ou le point d'un petit État, place ce point au centre du conteneur et applique un zoom de 1,55. La préférence est conservée sous la clé `atlas-club-auto-zoom`, séparément du score.
 
