@@ -25,19 +25,36 @@ Un pays correctement identifié la première fois rapporte 10 points. Les bonnes
 
 ## Sauvegarde
 
-Clé `localStorage` : `atlas-club-europe-v1`. Format :
+Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVersion: 2` :
 
 ```json
 {
+  "schemaVersion": 2,
   "stats": {
-    "FRA": { "attempts": 2, "mastered": true }
+    "FRA": {
+      "attempts": 3,
+      "mastered": true,
+      "correctAttempts": 1,
+      "wrongAttempts": 1,
+      "legacyAttempts": 1,
+      "lastAttemptAt": "2026-10-11T12:00:00.000Z"
+    }
   },
   "score": 10,
-  "streak": 1
+  "streak": 1,
+  "history": [
+    { "countryId": "FRA", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z" },
+    { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z" }
+  ],
+  "historyDropped": 0
 }
 ```
 
-Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a pas de synchronisation entre appareils.
+`stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays déjà trouvé au moins une fois. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` conservent leurs règles actuelles. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix de l'utilisateur, le résultat et sa date UTC ; les événements sont dans l'ordre des réponses.
+
+Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Le résultat des anciennes tentatives ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés. Un futur menu de difficultés pourra classer les pays par taux d'erreur (`wrongAttempts / (correctAttempts + wrongAttempts)`) ou examiner les derniers événements de chaque pays ; il doit ignorer `legacyAttempts` dans ce calcul.
+
+« Recommencer à zéro » efface aussi les statistiques et l'historique. Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a ni compte ni synchronisation entre appareils : deux personnes dans le même profil de navigateur partagent cette sauvegarde.
 
 ## Interface et accessibilité
 
