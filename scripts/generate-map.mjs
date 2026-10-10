@@ -45,6 +45,8 @@ const names = new Map(Object.entries({
 }));
 
 const bounds = { west: -14, east: 53, south: 31, north: 73 };
+// Enough surrounding geography to fill the viewport while zooming out, without a world map.
+const contextBounds = { west: -80, east: 120, south: 0, north: 85 };
 const width = 1000;
 const merc = latitude => Math.log(Math.tan(Math.PI / 4 + latitude * Math.PI / 360)) * 180 / Math.PI;
 const mercNorth = merc(bounds.north);
@@ -83,15 +85,15 @@ function simplify(points, tolerance) {
   return points.filter((_, i) => kept[i]);
 }
 
-function pathFor(feature, tolerance) {
+function pathFor(feature, tolerance, region = bounds) {
   const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
   const parts = [];
   for (const polygon of polygons) {
     for (const ring of polygon) {
       const longitudes = ring.map(point => point[0]);
       const latitudes = ring.map(point => point[1]);
-      if (Math.max(...longitudes) < bounds.west || Math.min(...longitudes) > bounds.east ||
-          Math.max(...latitudes) < bounds.south || Math.min(...latitudes) > bounds.north) continue;
+      if (Math.max(...longitudes) < region.west || Math.min(...longitudes) > region.east ||
+          Math.max(...latitudes) < region.south || Math.min(...latitudes) > region.north) continue;
       const projected = ring.map(project);
       const reduced = simplify(projected, tolerance);
       const points = reduced.length < 4 ? projected : reduced;
@@ -107,12 +109,12 @@ const context = [];
 for (const feature of source.features) {
   const name = feature.properties.ADMIN;
   const isCountry = names.has(name);
-  const d = pathFor(feature, isCountry ? 0.5 : 1.1);
-  if (!d) continue;
+  const background = pathFor(feature, 2, contextBounds);
+  if (background) context.push(background);
   if (isCountry) {
+    const d = pathFor(feature, 0.5);
+    if (!d) continue;
     countries.push({ id: feature.properties.ADM0_A3, name: names.get(name), d });
-  } else {
-    context.push(d);
   }
 }
 countries.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
@@ -131,6 +133,9 @@ const pins = [
   y: +project([longitude, latitude])[1].toFixed(1)
 }));
 
-const payload = { width, height, countries, context, pins };
+const [contextLeft, contextTop] = project([contextBounds.west, contextBounds.north]);
+const [contextRight, contextBottom] = project([contextBounds.east, contextBounds.south]);
+const contextExtent = { left: contextLeft, top: contextTop, right: contextRight, bottom: contextBottom };
+const payload = { width, height, contextExtent, countries, context, pins };
 fs.writeFileSync(path.join(output, 'map-data.js'), `window.EUROPE_MAP = ${JSON.stringify(payload)};\n`);
 console.log(`Generated ${countries.length} countries, ${context.length} surrounding areas; ${Math.round(fs.statSync(path.join(output, 'map-data.js')).size / 1024)} KiB`);
