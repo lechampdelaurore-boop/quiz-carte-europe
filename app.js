@@ -11,6 +11,7 @@
   const svg = document.getElementById('europe-map');
   const miniMap = document.getElementById('mini-map');
   const viewport = document.getElementById('map-viewport');
+  const mapTooltip = document.getElementById('map-tooltip');
   const quizPanel = document.getElementById('quiz-panel');
   const question = document.getElementById('quiz-question');
   const emptyQuestion = document.getElementById('quiz-empty');
@@ -37,6 +38,10 @@
   let pointerDrag = null;
   let suppressClick = false;
   let previousFocus = null;
+  let tooltipCountryId = null;
+  let tooltipFromTouch = false;
+  let tooltipTimer = null;
+  let lastTouchAt = 0;
 
   try { autoZoom.checked = localStorage.getItem('atlas-club-auto-zoom') !== 'false'; } catch (_) { /* Keep the default. */ }
   autoZoom.addEventListener('change', () => {
@@ -194,17 +199,75 @@
       : 'Sélectionne un pays sur la carte pour afficher les six propositions ici.';
   }
 
+  function hideCountryTooltip() {
+    clearTimeout(tooltipTimer);
+    tooltipTimer = null;
+    mapTooltip.hidden = true;
+    tooltipCountryId = null;
+    tooltipFromTouch = false;
+  }
+
+  function positionCountryTooltip(clientX, clientY) {
+    const rect = viewport.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const halfWidth = mapTooltip.offsetWidth / 2;
+    const left = Math.max(halfWidth + 10, Math.min(rect.width - halfWidth - 10, x));
+    const above = y - mapTooltip.offsetHeight - 16;
+    const top = above >= 10 ? above : Math.min(rect.height - mapTooltip.offsetHeight - 10, y + 16);
+    mapTooltip.style.left = `${left}px`;
+    mapTooltip.style.top = `${Math.max(10, top)}px`;
+  }
+
+  function showCountryTooltip(id, clientX, clientY, fromTouch = false) {
+    if (!progress.stats[id]?.mastered) return;
+    clearTimeout(tooltipTimer);
+    tooltipCountryId = id;
+    tooltipFromTouch = fromTouch;
+    mapTooltip.textContent = countryById.get(id).name;
+    mapTooltip.hidden = false;
+    positionCountryTooltip(clientX, clientY);
+    if (fromTouch) tooltipTimer = setTimeout(hideCountryTooltip, 4000);
+  }
+
   function registerCountry(node, id) {
     node.setAttribute('tabindex', '0');
     node.setAttribute('role', 'button');
     node.setAttribute('aria-label', `Zone de pays à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`);
-    node.addEventListener('click', () => {
+    node.addEventListener('click', event => {
       if (suppressClick) { suppressClick = false; return; }
+      const fromTouch = event.pointerType === 'touch' || Date.now() - lastTouchAt < 700;
+      if (fromTouch && progress.stats[id]?.mastered && (tooltipCountryId !== id || !tooltipFromTouch)) {
+        showCountryTooltip(id, event.clientX, event.clientY, true);
+        return;
+      }
+      hideCountryTooltip();
       openQuestion(id);
+    });
+    node.addEventListener('pointerenter', event => {
+      if (event.pointerType !== 'touch' && !pointerDrag?.moved) {
+        showCountryTooltip(id, event.clientX, event.clientY);
+      }
+    });
+    node.addEventListener('pointermove', event => {
+      if (event.pointerType !== 'touch' && tooltipCountryId === id && !tooltipFromTouch && !pointerDrag?.moved) {
+        positionCountryTooltip(event.clientX, event.clientY);
+      }
+    });
+    node.addEventListener('pointerleave', event => {
+      if (event.pointerType !== 'touch' && tooltipCountryId === id && !tooltipFromTouch) hideCountryTooltip();
+    });
+    node.addEventListener('focus', () => {
+      const rect = node.getBoundingClientRect();
+      showCountryTooltip(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    });
+    node.addEventListener('blur', () => {
+      if (tooltipCountryId === id && !tooltipFromTouch) hideCountryTooltip();
     });
     node.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        hideCountryTooltip();
         openQuestion(id);
       }
     });
@@ -282,11 +345,15 @@
       : `${countries.length - mastered} pays encore à découvrir.`;
 
     for (const country of countries) {
+      const masteredCountry = !!progress.stats[country.id]?.mastered;
       for (const node of nodes.get(country.id) || []) {
-        node.classList.toggle('mastered', !!progress.stats[country.id]?.mastered);
+        node.setAttribute('aria-label', masteredCountry
+          ? `${country.name}, pays découvert. Appuie pour rejouer.`
+          : `Zone de pays à identifier, numéro ${countries.findIndex(item => item.id === country.id) + 1}`);
+        node.classList.toggle('mastered', masteredCountry);
         node.classList.toggle('selected', country.id === selectedId);
         node.classList.toggle('wrong', country.id === selectedId && answered && feedback.classList.contains('bad'));
-        node.classList.toggle('pin-mastered', !!progress.stats[country.id]?.mastered);
+        node.classList.toggle('pin-mastered', masteredCountry);
         node.classList.toggle('pin-selected', country.id === selectedId);
       }
     }
@@ -294,6 +361,7 @@
 
   function openQuestion(id) {
     if (!countryById.has(id)) return;
+    hideCountryTooltip();
     previousFocus = document.activeElement;
     selectedId = id;
     answered = false;
@@ -527,6 +595,7 @@
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
+    hideCountryTooltip();
     progress = emptyProgress();
     saveProgress();
     updateSettingsInfo();
@@ -536,9 +605,12 @@
   document.getElementById('zoom-out').addEventListener('click', () => zoomFromCenter(1 / 1.25));
   viewport.addEventListener('wheel', event => {
     event.preventDefault();
+    hideCountryTooltip();
     applyZoom(zoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), event.clientX, event.clientY);
   }, { passive: false });
   viewport.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch') lastTouchAt = Date.now();
+    if (event.target === viewport || event.target.classList.contains('context-country')) hideCountryTooltip();
     if (event.pointerType === 'touch' || event.button !== 0) return;
     pointerDrag = { x: event.clientX, y: event.clientY, panX, panY, moved: false };
   });
@@ -549,6 +621,7 @@
     if (!pointerDrag.moved && Math.hypot(dx, dy) < 5) return;
     pointerDrag.moved = true;
     suppressClick = true;
+    hideCountryTooltip();
     viewport.classList.add('dragging');
     panX = pointerDrag.panX + dx;
     panY = pointerDrag.panY + dy;
@@ -562,8 +635,10 @@
     setTimeout(() => { suppressClick = false; }, 0);
   });
   viewport.addEventListener('touchstart', event => {
+    lastTouchAt = Date.now();
     if (event.touches.length === 1) touchPan = { x: event.touches[0].clientX, y: event.touches[0].clientY, panX, panY, moved: false };
     if (event.touches.length === 2) {
+      hideCountryTooltip();
       touchPan = null;
       pinch = { distance: touchDistance(event.touches[0], event.touches[1]), zoom };
     }
@@ -576,6 +651,7 @@
       event.preventDefault();
       touchPan.moved = true;
       suppressClick = true;
+      hideCountryTooltip();
       panX = touchPan.panX + dx;
       panY = touchPan.panY + dy;
       renderMap();
