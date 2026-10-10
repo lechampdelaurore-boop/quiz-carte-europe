@@ -1,14 +1,22 @@
 # Europe à la carte
 
-Jeu de géographie en français pour reconnaître **51 pays d'Europe** sur une carte interactive. Chaque question propose six noms et une seule bonne réponse. Le jeu fonctionne dans un navigateur sur ordinateur et sur mobile.
+Jeu de géographie en français pour reconnaître **51 pays d'Europe** sur une carte interactive. On peut répondre en choisissant parmi six noms ou en écrivant le nom du pays. Le jeu fonctionne dans un navigateur sur ordinateur et sur mobile.
 
 ## Jouer
 
-Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io/quiz-carte-europe/), ou `index.html` dans un navigateur. Cliquer ou toucher un pays sur la carte. Les huit petits pays difficiles à toucher ont aussi un point circulaire. Le bouton **Choisir un pays au hasard** propose un pays qui n'a pas encore été trouvé.
+Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io/quiz-carte-europe/), ou `index.html` dans un navigateur. Cliquer ou toucher un pays sur la carte. Les huit petits pays difficiles à toucher ont aussi un point circulaire. Par défaut, le bouton **Choisir un pays au hasard** privilégie les pays qui n'ont pas encore été trouvés.
+
+Le bouton **Réglages** (engrenage) permet de choisir :
+
+- **QCM** : six noms distincts, un seul correct ;
+- **Réponse libre** : saisir le nom du pays et valider avec Entrée ou le bouton. Les accents, articles, espaces, tirets et petites fautes de frappe sont tolérés. Le nom exact d'un autre pays reste une mauvaise réponse ;
+- **Découverte** : tirer en priorité les pays non trouvés ; **Tous les pays** : tirage uniforme ; **À réviser** : tirer les pays déjà ratés en donnant plus de chances aux plus difficiles. Si aucune erreur n'a encore été enregistrée, ce dernier mode reprend le tirage « Découverte ».
+
+Le choix des réglages est conservé dans ce navigateur et s'applique à la prochaine question. Un clic direct sur la carte permet toujours de choisir n'importe quel pays, quel que soit le mode de tirage.
 
 La carte se déplace en la faisant glisser et se zoome avec la molette, un pincement à deux doigts ou les boutons +/−. Au dézoom, un fond géographique prolonge l'Europe vers l'Atlantique, l'Afrique du Nord et l'Asie occidentale, sans afficher la carte du monde entière. Sur ordinateur, le bouton **Choisir un pays au hasard** se trouve entre **Mon atlas** et le quiz ; la question apparaît juste en dessous, à côté de la carte. La case **Zoom automatique sur le pays**, cochée par défaut, recentre la carte avec un léger agrandissement à chaque nouvelle question. Ce choix est enregistré dans le navigateur. Sur mobile, le quiz apparaît sous **Mon atlas** et comprend un aperçu du pays sélectionné ; la case de zoom automatique est masquée et la carte ne se recentre pas toute seule.
 
-Une bonne réponse rapporte **10 points lors de la première identification du pays**. Une mauvaise réponse révèle le nom et laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur, avec un historique daté des réponses et des compteurs de réussites et d'erreurs par pays. Ces données permettront plus tard de proposer des exercices ciblés sur les pays les plus difficiles. Elles restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Recommencer à zéro** efface aussi cet historique après confirmation.
+Une bonne réponse rapporte **10 points lors de la première identification du pays**, dans les deux modes. Une mauvaise réponse révèle le nom et laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur, avec un historique daté des réponses et des compteurs de réussites et d'erreurs par pays. Le mode « À réviser » utilise ces compteurs. Ces données restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Recommencer à zéro** efface aussi cet historique après confirmation, mais conserve les réglages.
 
 ## Lancer en local
 
@@ -51,7 +59,7 @@ Contours issus de [Natural Earth, Admin 0 Countries, échelle 1:10m](https://www
 
 ## Vérification rapide
 
-1. Ouvrir le jeu et choisir un pays : six réponses doivent apparaître, une seule étant correcte.
+1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses doivent apparaître, une seule étant correcte.
 2. Donner une bonne réponse : le score gagne 10 points et le pays devient vert.
 3. Recharger : le score et le pays trouvé restent présents.
 4. Donner une mauvaise réponse : le bon nom est révélé, sans nouveau point.
@@ -59,6 +67,7 @@ Contours issus de [Natural Earth, Admin 0 Countries, échelle 1:10m](https://www
 5. Sur ordinateur à 100 %, vérifier que la page entière tient à l'écran, que **Mon atlas** mesure moins de la moitié de la carte et que le quiz apparaît juste en dessous.
 6. Faire glisser la carte à la souris : elle doit se déplacer sans ouvrir de question. Dézoomer : les contours doivent continuer derrière l'Europe, sans bord rectangulaire net. Vérifier la molette et les boutons +/−.
 7. Tirer un pays au hasard avec la case **Zoom automatique** cochée : la carte se recentre. Décocher la case et recommencer : la carte ne doit pas bouger.
-8. Sur mobile, ouvrir une question : l'aperçu de la zone et les six réponses doivent être utilisables. Vérifier le glissement et le pincement à deux doigts.
+8. Dans **Réglages**, choisir **Réponse libre** et **À réviser** : le tirage doit privilégier les pays ratés. Une faute légère ou un accent omis doit être accepté ; le nom d'un autre pays doit être refusé. Recharger et vérifier que les choix restent cochés.
+9. Sur mobile, ouvrir une question dans chaque mode : l'aperçu de la zone et les réponses doivent être utilisables. Vérifier le glissement et le pincement à deux doigts.
 
 Les détails du fonctionnement et les choix à conserver lors d'une reprise se trouvent dans [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
