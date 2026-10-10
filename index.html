@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f6f5ef">
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-settings">
+  <link rel="stylesheet" href="styles.css?v=20261011-results">
   <script defer src="map-data.js"></script>
-  <script defer src="app.js?v=20261011-settings"></script>
+  <script defer src="app.js?v=20261011-results"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -87,6 +87,16 @@
       <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays déjà ratés, avec priorité aux plus difficiles.</small></span></label>
     </fieldset>
     <p class="settings-note" id="settings-note">Les réglages s'appliquent à la prochaine question. Tu peux toujours cliquer directement sur un pays de la carte.</p>
+  </dialog>
+  <dialog class="result-dialog" id="result-dialog" aria-labelledby="result-title" aria-describedby="result-detail">
+    <button class="result-advance" id="result-advance" type="button">
+      <span class="result-sparkles" aria-hidden="true"><i>✦</i><i>✦</i><i>✦</i></span>
+      <span class="result-icon" id="result-icon" aria-hidden="true">✓</span>
+      <span class="result-kicker" id="result-kicker">Bonne réponse</span>
+      <strong class="result-title" id="result-title">Bravo !</strong>
+      <span class="result-detail" id="result-detail"></span>
+      <span class="result-cta">Un autre pays <span aria-hidden="true">↗</span></span>
+    </button>
   </dialog>
 </body>
 </html>
