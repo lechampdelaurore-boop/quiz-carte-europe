@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f6f5ef">
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-results">
+  <link rel="stylesheet" href="styles.css?v=20261011-labels">
   <script defer src="map-data.js"></script>
-  <script defer src="app.js?v=20261011-results"></script>
+  <script defer src="app.js?v=20261011-labels"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -34,6 +34,7 @@
           <p class="map-instruction">Clique sur un pays. Glisse pour déplacer la carte ; zoome avec la molette, deux doigts ou +/−.</p>
           <div class="map-viewport" id="map-viewport">
             <svg id="europe-map" viewBox="0 0 1000 930" role="group" aria-label="Carte interactive des pays d’Europe"></svg>
+            <div class="map-tooltip" id="map-tooltip" role="status" aria-live="polite" hidden></div>
           </div>
           <div class="map-footer"><span><i class="legend-dot unplayed"></i> À découvrir</span><span><i class="legend-dot played"></i> Trouvé</span><span class="map-credit">Contours : Natural Earth</span></div>
         </div>
