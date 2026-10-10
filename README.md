@@ -12,7 +12,7 @@ Le bouton **Réglages** (engrenage) permet de choisir :
 - **Réponse libre** : saisir le nom du pays et valider avec Entrée ou le bouton. Les accents, articles, espaces, tirets et petites fautes de frappe sont tolérés. Le nom exact d'un autre pays reste une mauvaise réponse ;
 - **Découverte** : tirer en priorité les pays non trouvés ; **Tous les pays** : tirage uniforme ; **À réviser** : tirer les pays déjà ratés en donnant plus de chances aux plus difficiles. Si aucune erreur n'a encore été enregistrée, ce dernier mode reprend le tirage « Découverte ».
 
-Le choix des réglages est conservé dans ce navigateur et s'applique à la prochaine question. Un clic direct sur la carte permet toujours de choisir n'importe quel pays, quel que soit le mode de tirage.
+Le choix des réglages est conservé dans ce navigateur et s'applique à la prochaine question. Un clic direct sur la carte permet toujours de choisir n'importe quel pays, quel que soit le mode de tirage. Le nom d'un pays déjà trouvé apparaît dans une petite étiquette au survol sur ordinateur. Sur mobile, un premier toucher montre son nom pendant quelques secondes ; un second toucher sur ce pays ouvre une nouvelle question. Les pays encore inconnus ne dévoilent pas leur nom.
 
 La carte se déplace en la faisant glisser et se zoome avec la molette, un pincement à deux doigts ou les boutons +/−. Au dézoom, un fond géographique prolonge l'Europe vers l'Atlantique, l'Afrique du Nord et l'Asie occidentale, sans afficher la carte du monde entière. Sur ordinateur, le bouton **Choisir un pays au hasard** se trouve entre **Mon atlas** et le quiz ; la question apparaît juste en dessous, à côté de la carte. La case **Zoom automatique sur le pays**, cochée par défaut, recentre la carte avec un léger agrandissement à chaque nouvelle question. Ce choix est enregistré dans le navigateur. Sur mobile, le quiz apparaît sous **Mon atlas** et comprend un aperçu du pays sélectionné ; la case de zoom automatique est masquée et la carte ne se recentre pas toute seule.
 
@@ -62,6 +62,7 @@ Contours issus de [Natural Earth, Admin 0 Countries, échelle 1:10m](https://www
 1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses doivent apparaître, une seule étant correcte.
 2. Donner une bonne réponse : le score gagne 10 points et le pays devient vert.
 3. Recharger : le score et le pays trouvé restent présents.
+   Survoler ce pays : son nom doit apparaître dans la carte ; quitter le pays : l'étiquette disparaît. Sur mobile, le toucher une fois montre son nom sans ouvrir le quiz ; le toucher une seconde fois ouvre le quiz. Un pays non découvert n'affiche pas de nom.
 4. Donner une mauvaise réponse : le bon nom est révélé, sans nouveau point.
    Vérifier dans `localStorage` (`atlas-club-europe-v1`) que chaque réponse ajoute un événement à `history` et met à jour les compteurs du pays ; recharger et vérifier leur conservation.
    Vérifier que les fenêtres de bonne et de mauvaise réponse sont distinctes, et qu'un clic ou un appui sur chacune ouvre un autre pays.
