@@ -9,7 +9,10 @@
   const svg = document.getElementById('europe-map');
   const miniMap = document.getElementById('mini-map');
   const viewport = document.getElementById('map-viewport');
-  const modal = document.getElementById('quiz-modal');
+  const quizPanel = document.getElementById('quiz-panel');
+  const question = document.getElementById('quiz-question');
+  const emptyQuestion = document.getElementById('quiz-empty');
+  const autoZoom = document.getElementById('auto-zoom');
   const answers = document.getElementById('answers');
   const feedback = document.getElementById('feedback');
   const nextButton = document.getElementById('next-button');
@@ -17,8 +20,18 @@
   let selectedId = null;
   let answered = false;
   let zoom = 1;
+  let panX = 0;
+  let panY = 0;
   let pinch = null;
+  let touchPan = null;
+  let pointerDrag = null;
+  let suppressClick = false;
   let previousFocus = null;
+
+  try { autoZoom.checked = localStorage.getItem('atlas-club-auto-zoom') !== 'false'; } catch (_) { /* Keep the default. */ }
+  autoZoom.addEventListener('change', () => {
+    try { localStorage.setItem('atlas-club-auto-zoom', String(autoZoom.checked)); } catch (_) { /* Optional preference. */ }
+  });
 
   function loadProgress() {
     try {
@@ -58,7 +71,10 @@
     node.setAttribute('tabindex', '0');
     node.setAttribute('role', 'button');
     node.setAttribute('aria-label', `Zone de pays à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`);
-    node.addEventListener('click', () => openQuestion(id));
+    node.addEventListener('click', () => {
+      if (suppressClick) { suppressClick = false; return; }
+      openQuestion(id);
+    });
     node.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -94,6 +110,8 @@
     svg.append(pinLayer);
     buildMiniMap();
     updateUI();
+    renderMap();
+    new ResizeObserver(renderMap).observe(viewport);
   }
 
   function buildMiniMap() {
@@ -173,10 +191,12 @@
       button.addEventListener('click', () => submitAnswer(choice.id));
       answers.append(button);
     }
-    modal.hidden = false;
-    document.body.style.overflow = 'hidden';
+    emptyQuestion.hidden = true;
+    question.hidden = false;
+    if (autoZoom.checked) focusCountry(id);
     updateUI();
     answers.querySelector('button')?.focus();
+    if (window.matchMedia('(max-width: 850px)').matches) quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function submitAnswer(chosenId) {
@@ -210,8 +230,8 @@
   }
 
   function closeQuestion() {
-    modal.hidden = true;
-    document.body.style.overflow = '';
+    question.hidden = true;
+    emptyQuestion.hidden = false;
     selectedId = null;
     answered = false;
     feedback.className = 'feedback';
@@ -225,21 +245,48 @@
     openQuestion(pool[Math.floor(Math.random() * pool.length)].id);
   }
 
+  function fittedWidth() {
+    return Math.max(1, Math.min(viewport.clientWidth, viewport.clientHeight * map.width / map.height));
+  }
+
+  function renderMap() {
+    const width = fittedWidth() * zoom;
+    const height = width * map.height / map.width;
+    svg.style.width = `${width}px`;
+    svg.style.left = `${(viewport.clientWidth - width) / 2 + panX}px`;
+    svg.style.top = `${(viewport.clientHeight - height) / 2 + panY}px`;
+  }
+
   function applyZoom(nextZoom, clientX, clientY) {
     const clamped = Math.max(1, Math.min(3.5, nextZoom));
     if (Math.abs(clamped - zoom) < 0.001) return;
-    const viewportRect = viewport.getBoundingClientRect();
-    const oldRect = svg.getBoundingClientRect();
-    const localX = clientX - viewportRect.left;
-    const localY = clientY - viewportRect.top;
-    const relativeX = (viewport.scrollLeft + localX) / oldRect.width;
-    const relativeY = (viewport.scrollTop + localY) / oldRect.height;
+    const rect = viewport.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const oldWidth = fittedWidth() * zoom;
+    const oldHeight = oldWidth * map.height / map.width;
+    const mapX = (x - (viewport.clientWidth - oldWidth) / 2 - panX) / oldWidth;
+    const mapY = (y - (viewport.clientHeight - oldHeight) / 2 - panY) / oldHeight;
     zoom = clamped;
-    const baseWidth = Math.max(viewport.clientWidth, 650);
-    svg.style.width = `${baseWidth * zoom}px`;
-    const newRect = svg.getBoundingClientRect();
-    viewport.scrollLeft = relativeX * newRect.width - localX;
-    viewport.scrollTop = relativeY * newRect.height - localY;
+    const width = fittedWidth() * zoom;
+    const height = width * map.height / map.width;
+    panX = x - (viewport.clientWidth - width) / 2 - mapX * width;
+    panY = y - (viewport.clientHeight - height) / 2 - mapY * height;
+    renderMap();
+  }
+
+  function focusCountry(id) {
+    const pin = map.pins.find(item => item.id === id);
+    const shape = nodes.get(id).find(node => node.tagName.toLowerCase() === 'path');
+    const box = shape.getBBox();
+    const x = pin ? pin.x : box.x + box.width / 2;
+    const y = pin ? pin.y : box.y + box.height / 2;
+    zoom = 1.55;
+    const width = fittedWidth() * zoom;
+    const height = width * map.height / map.width;
+    panX = width * (0.5 - x / map.width);
+    panY = height * (0.5 - y / map.height);
+    renderMap();
   }
 
   function zoomFromCenter(factor) {
@@ -254,15 +301,8 @@
   document.getElementById('random-button').addEventListener('click', randomQuestion);
   document.getElementById('close-modal').addEventListener('click', closeQuestion);
   nextButton.addEventListener('click', () => { closeQuestion(); randomQuestion(); });
-  modal.addEventListener('click', event => { if (event.target === modal) closeQuestion(); });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !modal.hidden) closeQuestion();
-    if (event.key === 'Tab' && !modal.hidden) {
-      const focusable = [...modal.querySelectorAll('button:not([disabled]):not([hidden])')];
-      const first = focusable[0], last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
+    if (event.key === 'Escape' && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Effacer ton score et les pays déjà trouvés sur cet appareil ?')) return;
@@ -276,19 +316,62 @@
     event.preventDefault();
     applyZoom(zoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), event.clientX, event.clientY);
   }, { passive: false });
+  viewport.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch' || event.button !== 0) return;
+    pointerDrag = { x: event.clientX, y: event.clientY, panX, panY, moved: false };
+  });
+  document.addEventListener('pointermove', event => {
+    if (!pointerDrag) return;
+    const dx = event.clientX - pointerDrag.x;
+    const dy = event.clientY - pointerDrag.y;
+    if (!pointerDrag.moved && Math.hypot(dx, dy) < 5) return;
+    pointerDrag.moved = true;
+    suppressClick = true;
+    viewport.classList.add('dragging');
+    panX = pointerDrag.panX + dx;
+    panY = pointerDrag.panY + dy;
+    renderMap();
+    event.preventDefault();
+  });
+  document.addEventListener('pointerup', () => {
+    if (!pointerDrag) return;
+    pointerDrag = null;
+    viewport.classList.remove('dragging');
+    setTimeout(() => { suppressClick = false; }, 0);
+  });
   viewport.addEventListener('touchstart', event => {
-    if (event.touches.length !== 2) return;
-    pinch = { distance: touchDistance(event.touches[0], event.touches[1]), zoom };
+    if (event.touches.length === 1) touchPan = { x: event.touches[0].clientX, y: event.touches[0].clientY, panX, panY, moved: false };
+    if (event.touches.length === 2) {
+      touchPan = null;
+      pinch = { distance: touchDistance(event.touches[0], event.touches[1]), zoom };
+    }
   }, { passive: true });
   viewport.addEventListener('touchmove', event => {
-    if (event.touches.length !== 2 || !pinch) return;
-    event.preventDefault();
-    const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
-    const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
-    applyZoom(pinch.zoom * touchDistance(event.touches[0], event.touches[1]) / pinch.distance, centerX, centerY);
+    if (event.touches.length === 1 && touchPan) {
+      const dx = event.touches[0].clientX - touchPan.x;
+      const dy = event.touches[0].clientY - touchPan.y;
+      if (!touchPan.moved && Math.hypot(dx, dy) < 5) return;
+      event.preventDefault();
+      touchPan.moved = true;
+      suppressClick = true;
+      panX = touchPan.panX + dx;
+      panY = touchPan.panY + dy;
+      renderMap();
+    } else if (event.touches.length === 2 && pinch) {
+      event.preventDefault();
+      const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+      const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+      applyZoom(pinch.zoom * touchDistance(event.touches[0], event.touches[1]) / pinch.distance, centerX, centerY);
+    }
   }, { passive: false });
-  viewport.addEventListener('touchend', event => { if (event.touches.length < 2) pinch = null; });
-  viewport.addEventListener('touchcancel', () => { pinch = null; });
+  viewport.addEventListener('touchend', event => {
+    if (event.touches.length < 2) pinch = null;
+    if (event.touches.length === 0) {
+      touchPan = null;
+      setTimeout(() => { suppressClick = false; }, 0);
+    }
+  });
+  viewport.addEventListener('touchcancel', () => { pinch = null; touchPan = null; suppressClick = false; });
 
   buildMap();
 })();
