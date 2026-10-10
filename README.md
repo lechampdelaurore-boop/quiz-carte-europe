@@ -8,7 +8,7 @@ Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io
 
 La carte se déplace en la faisant glisser et se zoome avec la molette, un pincement à deux doigts ou les boutons +/−. Au dézoom, un fond géographique prolonge l'Europe vers l'Atlantique, l'Afrique du Nord et l'Asie occidentale, sans afficher la carte du monde entière. Sur ordinateur, le bouton **Choisir un pays au hasard** se trouve entre **Mon atlas** et le quiz ; la question apparaît juste en dessous, à côté de la carte. La case **Zoom automatique sur le pays**, cochée par défaut, recentre la carte avec un léger agrandissement à chaque nouvelle question. Ce choix est enregistré dans le navigateur. Sur mobile, le quiz apparaît sous **Mon atlas** et comprend un aperçu du pays sélectionné.
 
-Une bonne réponse rapporte **10 points lors de la première identification du pays**. Une mauvaise réponse révèle le nom et laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur ; elle reste propre à cet appareil et à ce navigateur. **Recommencer à zéro** efface cette sauvegarde après confirmation.
+Une bonne réponse rapporte **10 points lors de la première identification du pays**. Une mauvaise réponse révèle le nom et laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur, avec un historique daté des réponses et des compteurs de réussites et d'erreurs par pays. Ces données permettront plus tard de proposer des exercices ciblés sur les pays les plus difficiles. Elles restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Recommencer à zéro** efface aussi cet historique après confirmation.
 
 ## Lancer en local
 
@@ -55,6 +55,7 @@ Contours issus de [Natural Earth, Admin 0 Countries, échelle 1:10m](https://www
 2. Donner une bonne réponse : le score gagne 10 points et le pays devient vert.
 3. Recharger : le score et le pays trouvé restent présents.
 4. Donner une mauvaise réponse : le bon nom est révélé, sans nouveau point.
+   Vérifier dans `localStorage` (`atlas-club-europe-v1`) que chaque réponse ajoute un événement à `history` et met à jour les compteurs du pays ; recharger et vérifier leur conservation.
 5. Sur ordinateur à 100 %, vérifier que la page entière tient à l'écran, que **Mon atlas** mesure moins de la moitié de la carte et que le quiz apparaît juste en dessous.
 6. Faire glisser la carte à la souris : elle doit se déplacer sans ouvrir de question. Dézoomer : les contours doivent continuer derrière l'Europe, sans bord rectangulaire net. Vérifier la molette et les boutons +/−.
 7. Tirer un pays au hasard avec la case **Zoom automatique** cochée : la carte se recentre. Décocher la case et recommencer : la carte ne doit pas bouger.
