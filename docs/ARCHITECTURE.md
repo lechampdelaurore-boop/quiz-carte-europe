@@ -18,8 +18,8 @@ Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` tél�
 
 1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays. Un clic direct sur la carte ignore le filtre de tirage.
 2. `openQuestion` fige le mode de réponse pour cette question. En QCM, il tire cinq autres pays distincts et mélange les six choix. En réponse libre, il affiche un formulaire sans noms proposés.
-3. `submitAnswer` accepte une seule réponse, révèle la bonne et met à jour la progression. Un formulaire vide ne compte pas comme une tentative.
-4. Le bouton « Un autre pays » applique le filtre et la pondération choisis dans les réglages.
+3. `submitAnswer` accepte une seule réponse, révèle la bonne, met à jour la progression et ouvre `result-dialog`, avec une animation différente selon le résultat. Un formulaire vide ne compte pas comme une tentative.
+4. Le bouton dans la fenêtre de résultat et « Un autre pays » appellent tous deux `nextQuestion`, qui applique le filtre et la pondération choisis dans les réglages. Échap ferme la fenêtre de résultat et rend le bouton du quiz accessible.
 
 Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`). Ils s'appliquent à la prochaine question et ne sont pas effacés par « Recommencer à zéro ». Le tirage « Découverte » utilise les pays non trouvés, puis tous les pays si l'atlas est complet. « Tous les pays » est uniforme. « À réviser » utilise les pays ayant `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. Sans erreur enregistrée, « À réviser » reprend le tirage « Découverte ». Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
 
@@ -62,7 +62,7 @@ Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sa
 
 ## Interface et accessibilité
 
-Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages » est un dialogue modal natif, accessible au clavier, qui ne prend pas de place quand il est fermé. Les couleurs de correction s'accompagnent d'un texte explicite.
+Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages » et la fenêtre de résultat sont des dialogues modaux natifs, accessibles au clavier. Le résultat est aussi annoncé par du texte ; les animations sont désactivées avec `prefers-reduced-motion: reduce`.
 
 Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Le bouton de tirage au hasard se trouve entre « Mon atlas » et le quiz. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
 
