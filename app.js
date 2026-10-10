@@ -5,6 +5,7 @@
   const countries = map.countries;
   const countryById = new Map(countries.map(country => [country.id, country]));
   const storageKey = 'atlas-club-europe-v1';
+  const settingsKey = 'atlas-club-settings-v1';
   const historyLimit = 5000;
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.getElementById('europe-map');
@@ -17,9 +18,15 @@
   const answers = document.getElementById('answers');
   const feedback = document.getElementById('feedback');
   const nextButton = document.getElementById('next-button');
+  const freeAnswerForm = document.getElementById('free-answer-form');
+  const freeAnswerInput = document.getElementById('free-answer-input');
+  const freeAnswerSubmit = document.getElementById('free-answer-submit');
+  const settingsDialog = document.getElementById('settings-dialog');
   const nodes = new Map();
   let selectedId = null;
   let answered = false;
+  let questionMode = 'qcm';
+  let lastRandomId = null;
   let zoom = 1;
   let panX = 0;
   let panY = 0;
@@ -34,12 +41,27 @@
     try { localStorage.setItem('atlas-club-auto-zoom', String(autoZoom.checked)); } catch (_) { /* Optional preference. */ }
   });
 
+  function loadSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(settingsKey));
+      return {
+        answerMode: saved?.answerMode === 'open' ? 'open' : 'qcm',
+        countrySelection: ['all', 'review'].includes(saved?.countrySelection) ? saved.countrySelection : 'discover'
+      };
+    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover' }; }
+  }
+
+  const settings = loadSettings();
+  function saveSettings() {
+    try { localStorage.setItem(settingsKey, JSON.stringify(settings)); } catch (_) { /* The game still works. */ }
+  }
+
   function count(value) {
     return Number.isSafeInteger(value) && value >= 0 ? value : 0;
   }
 
   function emptyProgress() {
-    return { schemaVersion: 2, stats: {}, score: 0, streak: 0, history: [], historyDropped: 0 };
+    return { schemaVersion: 3, stats: {}, score: 0, streak: 0, history: [], historyDropped: 0 };
   }
 
   function loadProgress() {
@@ -69,7 +91,8 @@
         }
         if (Array.isArray(saved.history)) {
           const validHistory = saved.history.filter(item => item && countryById.has(item.countryId)
-            && countryById.has(item.chosenId) && typeof item.correct === 'boolean'
+            && (countryById.has(item.chosenId) || (item.mode === 'open' && item.chosenId === null))
+            && typeof item.correct === 'boolean'
             && typeof item.at === 'string');
           progress.history = validHistory.slice(-historyLimit);
           progress.historyDropped = count(saved.historyDropped) + Math.max(0, validHistory.length - historyLimit);
@@ -86,6 +109,7 @@
   function saveProgress() {
     try { localStorage.setItem(storageKey, JSON.stringify(progress)); } catch (_) { /* The game still works without persistence. */ }
   }
+  updateSettingsInfo();
 
   function element(name, attributes = {}) {
     const node = document.createElementNS(svgNS, name);
@@ -100,6 +124,72 @@
       [result[i], result[j]] = [result[j], result[i]];
     }
     return result;
+  }
+
+  function normalizeCountryName(value) {
+    return value.toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z]+/g, ' ').trim().replace(/^(?:l|le|la|les|un|une) /, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  // Damerau-Levenshtein (one adjacent letter swap counts as one typo).
+  function editDistance(a, b) {
+    const rows = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) rows[i][0] = i;
+    for (let j = 0; j <= b.length; j++) rows[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        rows[i][j] = Math.min(
+          rows[i - 1][j] + 1,
+          rows[i][j - 1] + 1,
+          rows[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+        }
+      }
+    }
+    return rows[a.length][b.length];
+  }
+
+  const countryAliases = { CZE: ['République tchèque'], BLR: ['Bélarus'] };
+  function matchTypedCountry(value) {
+    const typed = normalizeCountryName(value);
+    if (!typed) return null;
+    let bestId = null;
+    let bestDistance = Infinity;
+    let tied = false;
+    for (const country of countries) {
+      const names = [country.name, ...(countryAliases[country.id] || [])];
+      for (const name of names) {
+        const normalized = normalizeCountryName(name);
+        const distance = editDistance(typed, normalized);
+        const allowed = normalized.length <= 4 ? 0 : normalized.length <= 9 ? 1 : 2;
+        if (distance > allowed) continue;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestId = country.id;
+          tied = false;
+        } else if (distance === bestDistance && bestId !== country.id) {
+          tied = true;
+        }
+      }
+    }
+    return tied ? null : bestId;
+  }
+
+  function updateSettingsInfo() {
+    for (const radio of settingsDialog.querySelectorAll('input[type="radio"]')) {
+      radio.checked = radio.value === (radio.name === 'answer-mode' ? settings.answerMode : settings.countrySelection);
+    }
+    const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0).length;
+    document.getElementById('settings-note').textContent = difficultCount
+      ? `${difficultCount} pays avec au moins une erreur enregistrée. Les réglages s'appliquent à la prochaine question ; un clic sur la carte permet toujours de choisir un pays précis.`
+      : 'Aucune erreur enregistrée : « À réviser » proposera les pays à découvrir, puis tous les pays. Les réglages s’appliquent à la prochaine question.';
+    document.getElementById('quiz-empty-hint').textContent = settings.answerMode === 'open'
+      ? 'Sélectionne un pays sur la carte, puis écris son nom ici.'
+      : 'Sélectionne un pays sur la carte pour afficher les six propositions ici.';
   }
 
   function registerCountry(node, id) {
@@ -205,36 +295,45 @@
     previousFocus = document.activeElement;
     selectedId = id;
     answered = false;
+    questionMode = settings.answerMode;
     feedback.textContent = '';
     feedback.className = 'feedback';
     nextButton.hidden = true;
     const correct = countryById.get(id);
     updateMiniMap(id);
-    const distractors = shuffle(countries.filter(country => country.id !== id)).slice(0, 5);
-    const choices = shuffle([correct, ...distractors]);
     answers.replaceChildren();
+    answers.hidden = questionMode !== 'qcm';
+    freeAnswerForm.hidden = questionMode !== 'open';
+    freeAnswerInput.value = '';
+    freeAnswerInput.disabled = false;
+    freeAnswerSubmit.disabled = false;
     document.getElementById('question-number').textContent = `${String(countries.findIndex(country => country.id === id) + 1).padStart(2, '0')} / ${countries.length}`;
-    for (const [index, choice] of choices.entries()) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'answer';
-      button.dataset.id = choice.id;
-      const marker = document.createElement('span');
-      marker.className = 'answer-index';
-      marker.textContent = String.fromCharCode(65 + index);
-      button.append(marker, document.createTextNode(choice.name));
-      button.addEventListener('click', () => submitAnswer(choice.id));
-      answers.append(button);
+    if (questionMode === 'qcm') {
+      const distractors = shuffle(countries.filter(country => country.id !== id)).slice(0, 5);
+      const choices = shuffle([correct, ...distractors]);
+      for (const [index, choice] of choices.entries()) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'answer';
+        button.dataset.id = choice.id;
+        const marker = document.createElement('span');
+        marker.className = 'answer-index';
+        marker.textContent = String.fromCharCode(65 + index);
+        button.append(marker, document.createTextNode(choice.name));
+        button.addEventListener('click', () => submitAnswer(choice.id));
+        answers.append(button);
+      }
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
     if (autoZoom.checked && !window.matchMedia('(max-width: 850px)').matches) focusCountry(id);
     updateUI();
-    answers.querySelector('button')?.focus();
+    if (questionMode === 'open') freeAnswerInput.focus();
+    else answers.querySelector('button')?.focus();
     if (window.matchMedia('(max-width: 850px)').matches) quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function submitAnswer(chosenId) {
+  function submitAnswer(chosenId, enteredText = null) {
     if (answered || !selectedId) return;
     answered = true;
     const correct = chosenId === selectedId;
@@ -260,7 +359,9 @@
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
-    progress.history.push({ countryId: selectedId, chosenId, correct, at });
+    const event = { countryId: selectedId, chosenId, correct, at, mode: questionMode };
+    if (enteredText !== null) event.enteredText = enteredText;
+    progress.history.push(event);
     if (progress.history.length > historyLimit) {
       progress.historyDropped += progress.history.length - historyLimit;
       progress.history.splice(0, progress.history.length - historyLimit);
@@ -271,6 +372,8 @@
       if (button.dataset.id === selectedId) button.classList.add('correct');
       else if (button.dataset.id === chosenId) button.classList.add('wrong');
     }
+    freeAnswerInput.disabled = true;
+    freeAnswerSubmit.disabled = true;
     nextButton.hidden = false;
     updateUI();
     nextButton.focus();
@@ -288,8 +391,28 @@
 
   function randomQuestion() {
     const remaining = countries.filter(country => !progress.stats[country.id]?.mastered);
-    const pool = remaining.length ? remaining : countries;
-    openQuestion(pool[Math.floor(Math.random() * pool.length)].id);
+    const difficult = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0);
+    const pool = settings.countrySelection === 'all' ? countries
+      : settings.countrySelection === 'review' && difficult.length ? difficult
+      : remaining.length ? remaining : countries;
+    const candidates = pool.length > 1 ? pool.filter(country => country.id !== lastRandomId) : pool;
+    let chosen;
+    if (settings.countrySelection === 'review' && difficult.length) {
+      const weights = candidates.map(country => {
+        const stat = progress.stats[country.id];
+        return 1 + Math.min(6, stat.wrongAttempts) + 4 * stat.wrongAttempts / (stat.correctAttempts + stat.wrongAttempts);
+      });
+      let draw = Math.random() * weights.reduce((sum, weight) => sum + weight, 0);
+      chosen = candidates[candidates.length - 1];
+      for (let i = 0; i < candidates.length; i++) {
+        draw -= weights[i];
+        if (draw < 0) { chosen = candidates[i]; break; }
+      }
+    } else {
+      chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+    lastRandomId = chosen.id;
+    openQuestion(chosen.id);
   }
 
   function fittedWidth() {
@@ -353,15 +476,38 @@
   }
 
   document.getElementById('random-button').addEventListener('click', randomQuestion);
+  document.getElementById('settings-button').addEventListener('click', () => {
+    updateSettingsInfo();
+    settingsDialog.showModal();
+  });
+  document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
+  settingsDialog.addEventListener('change', event => {
+    if (event.target.name === 'answer-mode') settings.answerMode = event.target.value;
+    if (event.target.name === 'country-selection') settings.countrySelection = event.target.value;
+    saveSettings();
+    updateSettingsInfo();
+  });
+  freeAnswerForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const enteredText = freeAnswerInput.value.trim();
+    if (!enteredText) {
+      feedback.textContent = 'Écris un nom de pays avant de valider.';
+      feedback.className = 'feedback info';
+      freeAnswerInput.focus();
+      return;
+    }
+    submitAnswer(matchTypedCountry(enteredText), enteredText);
+  });
   document.getElementById('close-modal').addEventListener('click', closeQuestion);
   nextButton.addEventListener('click', () => { closeQuestion(); randomQuestion(); });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !question.hidden) closeQuestion();
+    if (event.key === 'Escape' && !settingsDialog.open && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
     progress = emptyProgress();
     saveProgress();
+    updateSettingsInfo();
     updateUI();
   });
   document.getElementById('zoom-in').addEventListener('click', () => zoomFromCenter(1.25));
