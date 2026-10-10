@@ -16,7 +16,7 @@ Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` tél�
 ## Cycle d'une question
 
 1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays.
-2. `openQuestion` tire cinq autres pays distincts, mélange les six choix et ouvre la fenêtre.
+2. `openQuestion` tire cinq autres pays distincts, mélange les six choix et affiche le panneau de quiz sous « Mon atlas ».
 3. `submitAnswer` accepte une seule réponse, révèle la bonne et met à jour la progression.
 4. Le bouton « Un autre pays » privilégie un pays encore non trouvé. Une fois les 51 pays trouvés, il peut proposer n'importe quel pays.
 
@@ -40,9 +40,13 @@ Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; da
 
 ## Interface et accessibilité
 
-Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. La fenêtre garde le focus à l'intérieur et se ferme avec Échap. Les couleurs de correction s'accompagnent d'un texte explicite.
+Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Les couleurs de correction s'accompagnent d'un texte explicite.
 
-Sur mobile, la carte conserve une largeur minimale pour permettre de toucher les pays et défile dans son conteneur. Les huit points agrandissent les petites cibles. La fenêtre affiche un aperçu centré sur la zone sélectionnée pour que l'emplacement reste visible même si la carte principale est masquée. Le zoom change la largeur du SVG, tout en conservant sous le pointeur ou au centre des doigts le même lieu sur la carte. Il est déclenché par la molette, un pincement à deux doigts ou les boutons +/−.
+Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
+
+Le SVG de la carte est positionné dans un conteneur fixe. `renderMap` applique le zoom et le déplacement `panX/panY` ; le niveau initial ajuste la carte à la hauteur disponible. Le glissement à la souris ou au doigt déplace la carte, et un seuil de cinq pixels distingue ce geste d'un clic sur un pays. La molette, les boutons +/− et le pincement à deux doigts modifient le zoom autour du pointeur ou du centre des doigts.
+
+La case **Zoom automatique sur le pays** est cochée par défaut. `focusCountry` utilise le centre du tracé SVG ou le point d'un petit État, place ce point au centre du conteneur et applique un zoom de 1,55. La préférence est conservée sous la clé `atlas-club-auto-zoom`, séparément du score.
 
 ## Déploiement
 
@@ -54,5 +58,5 @@ Tous les fichiers nécessaires au jeu sont à la racine du dépôt. GitHub Pages
 - Préserver la clé de sauvegarde ou prévoir une migration si le format change.
 - Mettre à jour la liste des noms, les points et la documentation ensemble si le périmètre passe de 51 pays à un autre total.
 - Vérifier le clic sur les petits pays et l'aperçu de question après toute modification de la projection ou de la carte.
-- Vérifier le zoom à la molette et au pincement après toute modification du conteneur de carte ou de ses règles `touch-action`.
+- Vérifier le glissement, le zoom à la molette, le pincement et le centrage automatique après toute modification du conteneur de carte ou de ses règles `touch-action`.
 - Ne pas ajouter le fichier GeoJSON mondial complet au dépôt : `map-data.js` est la version préparée pour le jeu.
