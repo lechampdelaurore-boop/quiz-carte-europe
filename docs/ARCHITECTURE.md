@@ -72,7 +72,7 @@ Sur ordinateur, la case **Zoom automatique sur le pays** est cochée par défaut
 
 ## Déploiement
 
-Tous les fichiers nécessaires au jeu sont à la racine du dépôt. GitHub Pages peut servir la branche `main`, dossier `/ (root)`, sans étape de build. Le script de génération et la documentation sont ignorés par le navigateur tant qu'ils ne sont pas ouverts directement.
+Tous les fichiers nécessaires au jeu sont à la racine du dépôt. GitHub Pages peut servir la branche `main`, dossier `/ (root)`, sans étape de build. Le script de génération et la documentation sont ignorés par le navigateur tant qu'ils ne sont pas ouverts directement. Après une modification de `app.js` ou `styles.css`, changer aussi son paramètre `v` dans `index.html` pour forcer le navigateur à charger la nouvelle version.
 
 ## Points d'attention pour les évolutions
 
