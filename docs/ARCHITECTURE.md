@@ -16,20 +16,24 @@ Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` tél�
 
 ## Cycle d'une question
 
-1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays.
-2. `openQuestion` tire cinq autres pays distincts, mélange les six choix et affiche le panneau de quiz sous « Mon atlas ».
-3. `submitAnswer` accepte une seule réponse, révèle la bonne et met à jour la progression.
-4. Le bouton « Un autre pays » privilégie un pays encore non trouvé. Une fois les 51 pays trouvés, il peut proposer n'importe quel pays.
+1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays. Un clic direct sur la carte ignore le filtre de tirage.
+2. `openQuestion` fige le mode de réponse pour cette question. En QCM, il tire cinq autres pays distincts et mélange les six choix. En réponse libre, il affiche un formulaire sans noms proposés.
+3. `submitAnswer` accepte une seule réponse, révèle la bonne et met à jour la progression. Un formulaire vide ne compte pas comme une tentative.
+4. Le bouton « Un autre pays » applique le filtre et la pondération choisis dans les réglages.
+
+Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`). Ils s'appliquent à la prochaine question et ne sont pas effacés par « Recommencer à zéro ». Le tirage « Découverte » utilise les pays non trouvés, puis tous les pays si l'atlas est complet. « Tous les pays » est uniforme. « À réviser » utilise les pays ayant `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. Sans erreur enregistrée, « À réviser » reprend le tirage « Découverte ». Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
+
+Pour la réponse libre, `normalizeCountryName` ignore majuscules, accents, articles initiaux, ponctuation et espaces multiples. `editDistance` compte l'échange de deux lettres voisines comme une seule faute. Un nom de quatre caractères ou moins doit être exact ; de cinq à neuf caractères, une faute est permise ; au-delà, deux fautes. `matchTypedCountry` cherche le pays reconnu le plus proche parmi les 51 noms et les variantes explicites « République tchèque » et « Bélarus ». Une égalité entre pays est refusée, et taper exactement le nom d'un autre pays reste une erreur. Le nom saisi est limité à 80 caractères.
 
 Un pays correctement identifié la première fois rapporte 10 points. Les bonnes réponses répétées prolongent la série sans ajouter de points. Les erreurs remettent la série à zéro. Le pourcentage de l'atlas correspond au nombre de pays trouvés au moins une fois divisé par 51. Un pays raté reste disponible.
 
 ## Sauvegarde
 
-Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVersion: 2` :
+Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVersion: 3` :
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stats": {
     "FRA": {
       "attempts": 3,
@@ -43,22 +47,22 @@ Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVers
   "score": 10,
   "streak": 1,
   "history": [
-    { "countryId": "FRA", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z" },
-    { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z" }
+    { "countryId": "FRA", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z", "mode": "qcm" },
+    { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z", "mode": "open", "enteredText": "Frnace" }
   ],
   "historyDropped": 0
 }
 ```
 
-`stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays déjà trouvé au moins une fois. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` conservent leurs règles actuelles. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix de l'utilisateur, le résultat et sa date UTC ; les événements sont dans l'ordre des réponses.
+`stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays déjà trouvé au moins une fois. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` conservent leurs règles actuelles. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix reconnu, le résultat, la date UTC et le mode ; les événements sont dans l'ordre des réponses. En mode libre, `enteredText` conserve le texte saisi ; `chosenId` vaut `null` si aucun pays n'a été reconnu. Les événements créés avant la version 3 peuvent ne pas avoir de champ `mode` : ils proviennent du QCM.
 
-Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Le résultat des anciennes tentatives ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés. Un futur menu de difficultés pourra classer les pays par taux d'erreur (`wrongAttempts / (correctAttempts + wrongAttempts)`) ou examiner les derniers événements de chaque pays ; il doit ignorer `legacyAttempts` dans ce calcul.
+Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Le résultat des tentatives antérieures à l'historique ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés.
 
 « Recommencer à zéro » efface aussi les statistiques et l'historique. Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a ni compte ni synchronisation entre appareils : deux personnes dans le même profil de navigateur partagent cette sauvegarde.
 
 ## Interface et accessibilité
 
-Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Les couleurs de correction s'accompagnent d'un texte explicite.
+Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Les noms ne figurent pas dans leur étiquette accessible afin de ne pas donner la réponse avant la question. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages » est un dialogue modal natif, accessible au clavier, qui ne prend pas de place quand il est fermé. Les couleurs de correction s'accompagnent d'un texte explicite.
 
 Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Le bouton de tirage au hasard se trouve entre « Mon atlas » et le quiz. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
 
@@ -72,7 +76,8 @@ Tous les fichiers nécessaires au jeu sont à la racine du dépôt. GitHub Pages
 
 ## Points d'attention pour les évolutions
 
-- Garder **exactement six réponses distinctes**, dont celle du pays sélectionné.
+- Garder **exactement six réponses distinctes en QCM**, dont celle du pays sélectionné ; ne pas les afficher en réponse libre.
+- Vérifier la reconnaissance des 51 noms et des petites fautes, ainsi que le refus du nom exact d'un autre pays, après toute modification de `matchTypedCountry`.
 - Préserver la clé de sauvegarde ou prévoir une migration si le format change.
 - Mettre à jour la liste des noms, les points et la documentation ensemble si le périmètre passe de 51 pays à un autre total.
 - Vérifier le clic sur les petits pays et l'aperçu de question après toute modification de la projection ou de la carte.
