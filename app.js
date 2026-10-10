@@ -5,6 +5,7 @@
   const countries = map.countries;
   const countryById = new Map(countries.map(country => [country.id, country]));
   const storageKey = 'atlas-club-europe-v1';
+  const historyLimit = 5000;
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.getElementById('europe-map');
   const miniMap = document.getElementById('mini-map');
@@ -33,18 +34,52 @@
     try { localStorage.setItem('atlas-club-auto-zoom', String(autoZoom.checked)); } catch (_) { /* Optional preference. */ }
   });
 
+  function count(value) {
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  }
+
+  function emptyProgress() {
+    return { schemaVersion: 2, stats: {}, score: 0, streak: 0, history: [], historyDropped: 0 };
+  }
+
   function loadProgress() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
-      if (saved && typeof saved === 'object' && saved.stats && typeof saved.stats === 'object') {
-        return {
-          stats: saved.stats,
-          score: Number.isFinite(saved.score) ? saved.score : 0,
-          streak: Number.isFinite(saved.streak) ? saved.streak : 0
-        };
+      if (saved && typeof saved === 'object' && saved.stats && typeof saved.stats === 'object' && !Array.isArray(saved.stats)) {
+        const progress = emptyProgress();
+        progress.score = count(saved.score);
+        progress.streak = count(saved.streak);
+        for (const country of countries) {
+          const old = saved.stats[country.id];
+          if (!old || typeof old !== 'object') continue;
+          const attempts = count(old.attempts);
+          const correctAttempts = count(old.correctAttempts);
+          const wrongAttempts = count(old.wrongAttempts);
+          const legacyAttempts = 'legacyAttempts' in old
+            ? count(old.legacyAttempts)
+            : Math.max(0, attempts - correctAttempts - wrongAttempts);
+          progress.stats[country.id] = {
+            attempts: Math.max(attempts, correctAttempts + wrongAttempts + legacyAttempts),
+            mastered: old.mastered === true,
+            correctAttempts,
+            wrongAttempts,
+            legacyAttempts,
+            lastAttemptAt: typeof old.lastAttemptAt === 'string' ? old.lastAttemptAt : null
+          };
+        }
+        if (Array.isArray(saved.history)) {
+          const validHistory = saved.history.filter(item => item && countryById.has(item.countryId)
+            && countryById.has(item.chosenId) && typeof item.correct === 'boolean'
+            && typeof item.at === 'string');
+          progress.history = validHistory.slice(-historyLimit);
+          progress.historyDropped = count(saved.historyDropped) + Math.max(0, validHistory.length - historyLimit);
+        } else {
+          progress.historyDropped = count(saved.historyDropped);
+        }
+        return progress;
       }
     } catch (_) { /* Storage may be unavailable in private browsing. */ }
-    return { stats: {}, score: 0, streak: 0 };
+    return emptyProgress();
   }
 
   let progress = loadProgress();
@@ -204,20 +239,32 @@
     answered = true;
     const correct = chosenId === selectedId;
     const country = countryById.get(selectedId);
-    const stat = progress.stats[selectedId] || { attempts: 0, mastered: false };
+    const stat = progress.stats[selectedId] || {
+      attempts: 0, mastered: false, correctAttempts: 0, wrongAttempts: 0,
+      legacyAttempts: 0, lastAttemptAt: null
+    };
+    const at = new Date().toISOString();
     stat.attempts++;
+    stat.lastAttemptAt = at;
     if (correct) {
+      stat.correctAttempts++;
       if (!stat.mastered) progress.score += 10;
       stat.mastered = true;
       progress.streak++;
       feedback.textContent = `Bien joué ! C'est ${country.name}.`;
       feedback.classList.add('good');
     } else {
+      stat.wrongAttempts++;
       progress.streak = 0;
       feedback.textContent = `Pas tout à fait : c'est ${country.name}. Réessaie ce pays plus tard !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
+    progress.history.push({ countryId: selectedId, chosenId, correct, at });
+    if (progress.history.length > historyLimit) {
+      progress.historyDropped += progress.history.length - historyLimit;
+      progress.history.splice(0, progress.history.length - historyLimit);
+    }
     saveProgress();
     for (const button of answers.querySelectorAll('button')) {
       button.disabled = true;
@@ -312,8 +359,8 @@
     if (event.key === 'Escape' && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
-    if (!window.confirm('Effacer ton score et les pays déjà trouvés sur cet appareil ?')) return;
-    progress = { stats: {}, score: 0, streak: 0 };
+    if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
+    progress = emptyProgress();
     saveProgress();
     updateUI();
   });
