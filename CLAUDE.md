@@ -10,4 +10,4 @@ Sur ordinateur à 100 %, la page entière tient à l'écran ; « Mon atlas » me
 
 Ne modifie pas `map-data.js` à la main. Modifie `scripts/generate-map.mjs`, puis lance `node scripts/generate-map.mjs` pour régénérer la carte. La révision de Natural Earth est épinglée dans le script.
 
-Après une modification, vérifie les scénarios de la section « Vérification rapide » du README, ainsi que les éventuelles erreurs JavaScript dans le navigateur. Déploie la branche `main` sur GitHub Pages si le dépôt utilise cette publication.
+Après une modification, vérifie les scénarios de la section « Vérification rapide » du README, ainsi que les éventuelles erreurs JavaScript dans le navigateur. Si `app.js` ou `styles.css` change, actualise aussi son paramètre `v` dans `index.html` pour éviter un ancien fichier en cache. Déploie la branche `main` sur GitHub Pages si le dépôt utilise cette publication.
