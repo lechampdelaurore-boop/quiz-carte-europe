@@ -10,6 +10,8 @@ Après une réponse, `result-dialog` présente une animation verte ou rouge. Le 
 
 Sur ordinateur à 100 %, la page entière tient à l'écran ; « Mon atlas » mesure moins de la moitié de la carte, le bouton de tirage au hasard est sous « Mon atlas » et le quiz juste en dessous. Les petits pays sont accessibles par des points sur la carte. La carte se déplace par glissement ; la molette, le pincement à deux doigts et les boutons règlent le zoom. Le fond géographique déborde du repère européen pour éviter une coupure au dézoom ; il est généré dans `map-data.js` depuis la source Natural Earth épinglée. La case de zoom automatique est enregistrée sous `atlas-club-auto-zoom`. Sur mobile (moins de 850 px), la case est masquée et le recentrage automatique désactivé ; la question montre un aperçu de la zone.
 
+Un pays déjà trouvé révèle son nom dans `map-tooltip` au survol ou au focus. Sur mobile, le premier toucher révèle le nom et le second ouvre le quiz ; les pays inconnus restent anonymes. Les points des petits pays suivent le même comportement. Ne pas révéler le nom des pays non découverts dans les étiquettes accessibles.
+
 Ne modifie pas `map-data.js` à la main. Modifie `scripts/generate-map.mjs`, puis lance `node scripts/generate-map.mjs` pour régénérer la carte. La révision de Natural Earth est épinglée dans le script.
 
 Après une modification, vérifie les scénarios de la section « Vérification rapide » du README, ainsi que les éventuelles erreurs JavaScript dans le navigateur. Si `app.js` ou `styles.css` change, actualise aussi son paramètre `v` dans `index.html` pour éviter un ancien fichier en cache. Déploie la branche `main` sur GitHub Pages si le dépôt utilise cette publication.
