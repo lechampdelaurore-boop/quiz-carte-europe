@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5ef">
+  <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
+  <title>Europe à la carte — quiz des pays</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="map-data.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>ATLAS CLUB <small>LE JEU DES PAYS</small></span></div>
+      <span class="header-note">Une carte. 51 pays. À toi de jouer.</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="main-title">
+        <div>
+          <span class="eyebrow">GÉOGRAPHIE · EUROPE</span>
+          <h1 id="main-title">L'Europe,<br><em>pays par pays.</em></h1>
+          <p>Clique sur un pays de la carte, puis retrouve son nom parmi six propositions. Chaque bonne réponse t’aide à compléter ton atlas.</p>
+          <button class="primary-button" id="random-button" type="button">Choisir un pays au hasard <span aria-hidden="true">↗</span></button>
+        </div>
+        <div class="intro-art" aria-hidden="true">
+          <span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="orbit orbit-three"></span>
+          <span class="art-star">✳</span><span class="art-caption">EXPLORE<br>LE CONTINENT</span>
+        </div>
+      </section>
+
+      <section class="game-layout" aria-label="Jeu de géographie">
+        <div class="map-card">
+          <div class="map-toolbar">
+            <div><span class="section-kicker">01 / LA CARTE</span><h2>Quel est ce pays ?</h2></div>
+            <div class="zoom-controls" aria-label="Taille de la carte">
+              <button id="zoom-out" type="button" aria-label="Réduire la carte">−</button>
+              <button id="zoom-in" type="button" aria-label="Agrandir la carte">+</button>
+            </div>
+          </div>
+          <p class="map-instruction">Sélectionne un pays. Zoome avec la molette, les deux doigts ou les boutons +/−.</p>
+          <div class="map-viewport" id="map-viewport">
+            <svg id="europe-map" viewBox="0 0 1000 930" role="group" aria-label="Carte interactive des pays d’Europe"></svg>
+          </div>
+          <div class="map-footer"><span><i class="legend-dot unplayed"></i> À découvrir</span><span><i class="legend-dot played"></i> Trouvé</span><span class="map-credit">Contours : Natural Earth</span></div>
+        </div>
+
+        <aside class="progress-card" aria-labelledby="progress-heading">
+          <span class="section-kicker">02 / TON PARCOURS</span>
+          <h2 id="progress-heading">Mon atlas</h2>
+          <div class="progress-ring" id="progress-ring"><div><strong id="mastered-count">0</strong><span>/ 51 pays</span></div></div>
+          <p class="progress-caption" id="progress-caption">Ton voyage commence ici.</p>
+          <div class="stats-grid">
+            <div><span>POINTS</span><strong id="score">0</strong></div>
+            <div><span>SÉRIE</span><strong id="streak">0</strong></div>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="Pays reconnus" aria-valuemin="0" aria-valuemax="51" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
+          <p class="save-note"><span aria-hidden="true">✓</span> Ta progression est enregistrée sur cet appareil.</p>
+          <button class="reset-button" id="reset-button" type="button">Recommencer à zéro</button>
+        </aside>
+      </section>
+      <p class="footnote">Les frontières et la définition de l’Europe peuvent varier selon les sources. Les pays transcontinentaux et le Kosovo sont inclus dans ce jeu.</p>
+    </main>
+    <footer class="site-footer"><span>ATLAS CLUB © 2026</span><span>Apprendre un pays à la fois.</span></footer>
+  </div>
+
+  <div class="modal-backdrop" id="quiz-modal" hidden>
+    <section class="quiz-dialog" role="dialog" aria-modal="true" aria-labelledby="quiz-title" aria-describedby="quiz-hint">
+      <button class="close-button" id="close-modal" type="button" aria-label="Fermer la question">×</button>
+      <span class="section-kicker">DÉFI GÉOGRAPHIE <span id="question-number"></span></span>
+      <div class="question-icon" aria-hidden="true">?</div>
+      <h2 id="quiz-title">Quel est ce pays ?</h2>
+      <p id="quiz-hint">Le pays sélectionné est surligné sur la carte. Choisis la bonne réponse.</p>
+      <div class="question-preview" aria-label="Aperçu de la zone sélectionnée"><svg id="mini-map" role="img" aria-label="Le pays à identifier est coloré en orange"></svg></div>
+      <div class="answers" id="answers"></div>
+      <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+      <button class="primary-button next-button" id="next-button" type="button" hidden>Un autre pays <span aria-hidden="true">↗</span></button>
+    </section>
+  </div>
+</body>
+</html>
