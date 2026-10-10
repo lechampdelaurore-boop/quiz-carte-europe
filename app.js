@@ -228,7 +228,7 @@
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
-    if (autoZoom.checked) focusCountry(id);
+    if (autoZoom.checked && !window.matchMedia('(max-width: 850px)').matches) focusCountry(id);
     updateUI();
     answers.querySelector('button')?.focus();
     if (window.matchMedia('(max-width: 850px)').matches) quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
