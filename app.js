@@ -252,13 +252,20 @@
   function renderMap() {
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
+    const extent = map.contextExtent;
+    const leftLimit = viewport.clientWidth - (viewport.clientWidth - width) / 2 - extent.right / map.width * width;
+    const rightLimit = -(viewport.clientWidth - width) / 2 - extent.left / map.width * width;
+    const topLimit = viewport.clientHeight - (viewport.clientHeight - height) / 2 - extent.bottom / map.height * height;
+    const bottomLimit = -(viewport.clientHeight - height) / 2 - extent.top / map.height * height;
+    panX = leftLimit <= rightLimit ? Math.max(leftLimit, Math.min(rightLimit, panX)) : (leftLimit + rightLimit) / 2;
+    panY = topLimit <= bottomLimit ? Math.max(topLimit, Math.min(bottomLimit, panY)) : (topLimit + bottomLimit) / 2;
     svg.style.width = `${width}px`;
     svg.style.left = `${(viewport.clientWidth - width) / 2 + panX}px`;
     svg.style.top = `${(viewport.clientHeight - height) / 2 + panY}px`;
   }
 
   function applyZoom(nextZoom, clientX, clientY) {
-    const clamped = Math.max(1, Math.min(3.5, nextZoom));
+    const clamped = Math.max(0.85, Math.min(3.5, nextZoom));
     if (Math.abs(clamped - zoom) < 0.001) return;
     const rect = viewport.getBoundingClientRect();
     const x = clientX - rect.left;
