@@ -23,6 +23,14 @@
   const freeAnswerInput = document.getElementById('free-answer-input');
   const freeAnswerSubmit = document.getElementById('free-answer-submit');
   const settingsDialog = document.getElementById('settings-dialog');
+  const historyDialog = document.getElementById('history-dialog');
+  const historyRows = document.getElementById('history-rows');
+  const timedModeInput = document.getElementById('timed-mode');
+  const timerSetting = document.getElementById('timer-setting');
+  const timerSecondsInput = document.getElementById('timer-seconds');
+  const timerError = document.getElementById('timer-error');
+  const quizTimer = document.getElementById('quiz-timer');
+  const timerValue = document.getElementById('timer-value');
   const resultDialog = document.getElementById('result-dialog');
   const resultAdvance = document.getElementById('result-advance');
   const nodes = new Map();
@@ -42,20 +50,33 @@
   let tooltipFromTouch = false;
   let tooltipTimer = null;
   let lastTouchAt = 0;
+  let timerInterval = null;
+  let timerDeadline = 0;
+  let timerRemainingMs = 0;
+  let activeTimedQuestion = false;
 
   try { autoZoom.checked = localStorage.getItem('atlas-club-auto-zoom') !== 'false'; } catch (_) { /* Keep the default. */ }
   autoZoom.addEventListener('change', () => {
     try { localStorage.setItem('atlas-club-auto-zoom', String(autoZoom.checked)); } catch (_) { /* Optional preference. */ }
   });
 
+  function validTimerSeconds(value) {
+    const text = String(value ?? '').trim();
+    const seconds = Number(text);
+    return /^\d+$/.test(text) && Number.isSafeInteger(seconds) && seconds >= 1 && seconds <= 3600
+      ? seconds : null;
+  }
+
   function loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem(settingsKey));
       return {
         answerMode: saved?.answerMode === 'open' ? 'open' : 'qcm',
-        countrySelection: ['all', 'review'].includes(saved?.countrySelection) ? saved.countrySelection : 'discover'
+        countrySelection: ['all', 'review'].includes(saved?.countrySelection) ? saved.countrySelection : 'discover',
+        timedMode: saved?.timedMode === true,
+        timerSeconds: validTimerSeconds(saved?.timerSeconds) ?? 30
       };
-    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover' }; }
+    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover', timedMode: false, timerSeconds: 30 }; }
   }
 
   const settings = loadSettings();
@@ -98,7 +119,7 @@
         }
         if (Array.isArray(saved.history)) {
           const validHistory = saved.history.filter(item => item && countryById.has(item.countryId)
-            && (countryById.has(item.chosenId) || (item.mode === 'open' && item.chosenId === null))
+            && (countryById.has(item.chosenId) || (item.chosenId === null && (item.mode === 'open' || item.timedOut === true)))
             && typeof item.correct === 'boolean'
             && typeof item.at === 'string');
           progress.history = validHistory.slice(-historyLimit);
@@ -190,6 +211,11 @@
     for (const radio of settingsDialog.querySelectorAll('input[type="radio"]')) {
       radio.checked = radio.value === (radio.name === 'answer-mode' ? settings.answerMode : settings.countrySelection);
     }
+    timedModeInput.checked = settings.timedMode;
+    timerSetting.hidden = !settings.timedMode;
+    timerSecondsInput.value = settings.timerSeconds;
+    timerSecondsInput.removeAttribute('aria-invalid');
+    timerError.hidden = true;
     const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0).length;
     document.getElementById('settings-note').textContent = difficultCount
       ? `${difficultCount} pays avec au moins une erreur enregistrée. Les réglages s'appliquent à la prochaine question ; un clic sur la carte permet toujours de choisir un pays précis.`
@@ -197,6 +223,81 @@
     document.getElementById('quiz-empty-hint').textContent = settings.answerMode === 'open'
       ? 'Sélectionne un pays sur la carte, puis écris son nom ici.'
       : 'Sélectionne un pays sur la carte pour afficher les six propositions ici.';
+  }
+
+  function showTimerInputError() {
+    const valid = validTimerSeconds(timerSecondsInput.value) !== null;
+    timerSecondsInput.setAttribute('aria-invalid', String(!valid));
+    timerError.textContent = valid ? '' : 'Entre une durée entière de 1 à 3 600 secondes.';
+    timerError.hidden = valid;
+    return valid;
+  }
+
+  function closeSettings() {
+    if (settings.timedMode && !showTimerInputError()) {
+      timerSecondsInput.focus();
+      return;
+    }
+    settingsDialog.close();
+  }
+
+  const historyDate = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+  function renderHistory() {
+    const ordered = [...countries].sort((first, second) =>
+      (progress.stats[second.id]?.wrongAttempts || 0) - (progress.stats[first.id]?.wrongAttempts || 0)
+      || first.name.localeCompare(second.name, 'fr'));
+    const totalErrors = ordered.reduce((total, country) => total + (progress.stats[country.id]?.wrongAttempts || 0), 0);
+    const countriesWithErrors = ordered.filter(country => progress.stats[country.id]?.wrongAttempts > 0).length;
+    const maxErrors = progress.stats[ordered[0].id]?.wrongAttempts || 0;
+    document.getElementById('history-summary').textContent = totalErrors
+      ? `${totalErrors} erreur${totalErrors > 1 ? 's' : ''} sur ${countriesWithErrors} pays.`
+      : 'Aucune erreur enregistrée pour le moment.';
+    const rows = ordered.map(country => {
+      const stat = progress.stats[country.id];
+      const errors = stat?.wrongAttempts || 0;
+      const row = document.createElement('div');
+      row.className = `history-row${errors ? ' has-errors' : ''}`;
+      row.setAttribute('role', 'row');
+      const name = document.createElement('span');
+      name.className = 'history-country';
+      name.setAttribute('role', 'cell');
+      const label = document.createElement('span');
+      label.className = 'history-country-name';
+      label.textContent = country.name;
+      name.append(label);
+      if (errors) {
+        const bar = document.createElement('span');
+        bar.className = 'history-bar';
+        bar.style.width = `${Math.max(8, errors / maxErrors * 100)}%`;
+        bar.setAttribute('aria-hidden', 'true');
+        name.append(bar);
+      }
+      const wrong = document.createElement('span');
+      wrong.className = 'history-errors';
+      wrong.setAttribute('role', 'cell');
+      wrong.textContent = errors;
+      const attempts = document.createElement('span');
+      attempts.className = 'history-attempts';
+      attempts.setAttribute('role', 'cell');
+      attempts.textContent = stat?.attempts || 0;
+      row.append(name, wrong, attempts);
+      return row;
+    });
+    historyRows.replaceChildren(...rows);
+    const recent = progress.history.slice(-20).reverse().map(item => {
+      const entry = document.createElement('li');
+      const date = new Date(item.at);
+      const when = Number.isNaN(date.getTime()) ? '' : ` · ${historyDate.format(date)}`;
+      const outcome = item.timedOut ? 'temps écoulé' : item.correct ? 'juste' : 'faux';
+      entry.textContent = `${countryById.get(item.countryId).name} — ${outcome}${when}`;
+      return entry;
+    });
+    if (!recent.length) {
+      const empty = document.createElement('li');
+      empty.textContent = 'Aucune réponse enregistrée.';
+      recent.push(empty);
+    }
+    document.getElementById('recent-history-list').replaceChildren(...recent);
   }
 
   function hideCountryTooltip() {
@@ -359,6 +460,57 @@
     }
   }
 
+  function renderQuestionTimer() {
+    const seconds = Math.max(0, Math.ceil(timerRemainingMs / 1000));
+    timerValue.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    quizTimer.classList.toggle('urgent', seconds <= 10);
+  }
+
+  function stopQuestionTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerDeadline = 0;
+    timerRemainingMs = 0;
+    activeTimedQuestion = false;
+    quizTimer.hidden = true;
+  }
+
+  function tickQuestionTimer() {
+    if (!activeTimedQuestion || answered || question.hidden) return;
+    timerRemainingMs = Math.max(0, timerDeadline - Date.now());
+    renderQuestionTimer();
+    if (timerRemainingMs === 0) submitAnswer(null, null, true);
+  }
+
+  function pauseQuestionTimer() {
+    if (timerInterval === null) return;
+    timerRemainingMs = Math.max(0, timerDeadline - Date.now());
+    clearInterval(timerInterval);
+    timerInterval = null;
+    renderQuestionTimer();
+  }
+
+  function resumeQuestionTimer() {
+    if (!activeTimedQuestion || answered || question.hidden) return;
+    if (timerRemainingMs === 0) {
+      submitAnswer(null, null, true);
+      return;
+    }
+    timerDeadline = Date.now() + timerRemainingMs;
+    timerInterval = setInterval(tickQuestionTimer, 250);
+    tickQuestionTimer();
+  }
+
+  function startQuestionTimer() {
+    stopQuestionTimer();
+    if (!settings.timedMode) return;
+    activeTimedQuestion = true;
+    timerRemainingMs = settings.timerSeconds * 1000;
+    quizTimer.hidden = false;
+    renderQuestionTimer();
+    resumeQuestionTimer();
+  }
+
   function openQuestion(id) {
     if (!countryById.has(id)) return;
     hideCountryTooltip();
@@ -396,6 +548,7 @@
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
+    startQuestionTimer();
     if (autoZoom.checked && !window.matchMedia('(max-width: 850px)').matches) focusCountry(id);
     updateUI();
     if (questionMode === 'open') freeAnswerInput.focus();
@@ -403,9 +556,10 @@
     if (window.matchMedia('(max-width: 850px)').matches) quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function submitAnswer(chosenId, enteredText = null) {
+  function submitAnswer(chosenId, enteredText = null, timedOut = false) {
     if (answered || !selectedId) return;
     answered = true;
+    stopQuestionTimer();
     const correct = chosenId === selectedId;
     const country = countryById.get(selectedId);
     const stat = progress.stats[selectedId] || {
@@ -425,12 +579,15 @@
     } else {
       stat.wrongAttempts++;
       progress.streak = 0;
-      feedback.textContent = `Pas tout à fait : c'est ${country.name}. Réessaie ce pays plus tard !`;
+      feedback.textContent = timedOut
+        ? `Temps écoulé : c'est ${country.name}. Réessaie ce pays plus tard !`
+        : `Pas tout à fait : c'est ${country.name}. Réessaie ce pays plus tard !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
     const event = { countryId: selectedId, chosenId, correct, at, mode: questionMode };
     if (enteredText !== null) event.enteredText = enteredText;
+    if (timedOut) event.timedOut = true;
     progress.history.push(event);
     if (progress.history.length > historyLimit) {
       progress.historyDropped += progress.history.length - historyLimit;
@@ -449,7 +606,7 @@
     resultDialog.dataset.result = correct ? 'good' : 'bad';
     document.getElementById('result-icon').textContent = correct ? '✓' : '×';
     document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
-    document.getElementById('result-title').textContent = correct ? 'Bravo !' : 'À réviser !';
+    document.getElementById('result-title').textContent = correct ? 'Bravo !' : timedOut ? 'Temps écoulé !' : 'À réviser !';
     document.getElementById('result-detail').textContent = correct
       ? `Tu as reconnu ${country.name}.`
       : `La bonne réponse était ${country.name}.`;
@@ -458,6 +615,7 @@
   }
 
   function closeQuestion() {
+    stopQuestionTimer();
     question.hidden = true;
     emptyQuestion.hidden = false;
     selectedId = null;
@@ -561,16 +719,41 @@
 
   document.getElementById('random-button').addEventListener('click', randomQuestion);
   document.getElementById('settings-button').addEventListener('click', () => {
+    pauseQuestionTimer();
     updateSettingsInfo();
     settingsDialog.showModal();
   });
-  document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
+  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  settingsDialog.addEventListener('cancel', event => {
+    if (settings.timedMode && !showTimerInputError()) {
+      event.preventDefault();
+      timerSecondsInput.focus();
+    }
+  });
+  settingsDialog.addEventListener('close', resumeQuestionTimer);
   settingsDialog.addEventListener('change', event => {
     if (event.target.name === 'answer-mode') settings.answerMode = event.target.value;
     if (event.target.name === 'country-selection') settings.countrySelection = event.target.value;
+    if (event.target === timedModeInput) {
+      settings.timedMode = timedModeInput.checked;
+      timerSetting.hidden = !settings.timedMode;
+    }
     saveSettings();
-    updateSettingsInfo();
+    if (event.target.name === 'answer-mode' || event.target.name === 'country-selection') updateSettingsInfo();
   });
+  timerSecondsInput.addEventListener('input', () => {
+    if (showTimerInputError()) {
+      settings.timerSeconds = validTimerSeconds(timerSecondsInput.value);
+      saveSettings();
+    }
+  });
+  document.getElementById('history-button').addEventListener('click', () => {
+    pauseQuestionTimer();
+    renderHistory();
+    historyDialog.showModal();
+  });
+  document.getElementById('history-close').addEventListener('click', () => historyDialog.close());
+  historyDialog.addEventListener('close', resumeQuestionTimer);
   freeAnswerForm.addEventListener('submit', event => {
     event.preventDefault();
     const enteredText = freeAnswerInput.value.trim();
@@ -591,7 +774,7 @@
     nextButton.focus();
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !settingsDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
+    if (event.key === 'Escape' && !settingsDialog.open && !historyDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
