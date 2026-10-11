@@ -775,10 +775,11 @@
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
     const mapUnitsPerPixel = map.width / width;
+    const pinVisualScale = window.matchMedia('(min-width: 851px)').matches ? 1.5 : 1;
     for (const group of pinGroups) {
       group.querySelector('.pin-hit').setAttribute('r', (18 * mapUnitsPerPixel).toFixed(2));
-      group.querySelector('.pin-halo')?.setAttribute('r', (5 * mapUnitsPerPixel).toFixed(2));
-      group.querySelector('.pin-core')?.setAttribute('r', (2 * mapUnitsPerPixel).toFixed(2));
+      group.querySelector('.pin-halo')?.setAttribute('r', (5 * pinVisualScale * mapUnitsPerPixel).toFixed(2));
+      group.querySelector('.pin-core')?.setAttribute('r', (2 * pinVisualScale * mapUnitsPerPixel).toFixed(2));
     }
     const extent = map.contextExtent;
     const leftLimit = viewport.clientWidth - (viewport.clientWidth - width) / 2 - extent.right / map.width * width;
