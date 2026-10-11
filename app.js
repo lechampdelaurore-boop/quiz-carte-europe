@@ -4,6 +4,38 @@
   const map = window.EUROPE_MAP;
   const countries = map.countries;
   const countryById = new Map(countries.map(country => [country.id, country]));
+  // Land borders between playable zones, from the pinned Natural Earth 10m countries and map units.
+  // UK map units are separate quiz answers; islands without a playable land neighbor have [].
+  const landNeighbors = {
+    ALB: ['GRC', 'KOS', 'MKD', 'MNE'], AND: ['ESP', 'FRA'],
+    ARM: ['AZE', 'GEO', 'TUR'], AUT: ['CHE', 'CZE', 'DEU', 'HUN', 'ITA', 'LIE', 'SVK', 'SVN'],
+    AZE: ['ARM', 'GEO', 'RUS', 'TUR'], BEL: ['DEU', 'FRA', 'LUX', 'NLD'],
+    BGR: ['GRC', 'MKD', 'ROU', 'SRB', 'TUR'], BIH: ['HRV', 'MNE', 'SRB'],
+    BLR: ['LTU', 'LVA', 'POL', 'RUS', 'UKR'], CHE: ['AUT', 'DEU', 'FRA', 'ITA', 'LIE'],
+    CYP: [], CZE: ['AUT', 'DEU', 'POL', 'SVK'],
+    DEU: ['AUT', 'BEL', 'CHE', 'CZE', 'DNK', 'FRA', 'LUX', 'NLD', 'POL'],
+    DNK: ['DEU'], ENG: ['SCT', 'WLS'], ESP: ['AND', 'FRA', 'PRT'],
+    EST: ['LVA', 'RUS'], FIN: ['NOR', 'RUS', 'SWE'],
+    FRA: ['AND', 'BEL', 'CHE', 'DEU', 'ESP', 'ITA', 'LUX', 'MCO'],
+    GEO: ['ARM', 'AZE', 'RUS', 'TUR'], GRC: ['ALB', 'BGR', 'MKD', 'TUR'],
+    HRV: ['BIH', 'HUN', 'MNE', 'SRB', 'SVN'],
+    HUN: ['AUT', 'HRV', 'ROU', 'SRB', 'SVK', 'SVN', 'UKR'],
+    IRL: ['NIR'], ISL: [], ITA: ['AUT', 'CHE', 'FRA', 'SMR', 'SVN', 'VAT'],
+    KAZ: ['RUS'], KOS: ['ALB', 'MKD', 'MNE', 'SRB'], LIE: ['AUT', 'CHE'],
+    LTU: ['BLR', 'LVA', 'POL', 'RUS'], LUX: ['BEL', 'DEU', 'FRA'],
+    LVA: ['BLR', 'EST', 'LTU', 'RUS'], MCO: ['FRA'], MDA: ['ROU', 'UKR'],
+    MKD: ['ALB', 'BGR', 'GRC', 'KOS', 'SRB'], MLT: [],
+    MNE: ['ALB', 'BIH', 'HRV', 'KOS', 'SRB'], NIR: ['IRL'],
+    NLD: ['BEL', 'DEU'], NOR: ['FIN', 'RUS', 'SWE'], POL: ['BLR', 'CZE', 'DEU', 'LTU', 'RUS', 'SVK', 'UKR'],
+    PRT: ['ESP'], ROU: ['BGR', 'HUN', 'MDA', 'SRB', 'UKR'],
+    RUS: ['AZE', 'BLR', 'EST', 'FIN', 'GEO', 'KAZ', 'LTU', 'LVA', 'NOR', 'POL', 'UKR'],
+    SCT: ['ENG'], SMR: ['ITA'],
+    SRB: ['BGR', 'BIH', 'HRV', 'HUN', 'KOS', 'MKD', 'MNE', 'ROU'],
+    SVK: ['AUT', 'CZE', 'HUN', 'POL', 'UKR'], SVN: ['AUT', 'HRV', 'HUN', 'ITA'],
+    SWE: ['FIN', 'NOR'], TUR: ['ARM', 'AZE', 'BGR', 'GEO', 'GRC'],
+    UKR: ['BLR', 'HUN', 'MDA', 'POL', 'ROU', 'RUS', 'SVK'],
+    VAT: ['ITA'], WLS: ['ENG']
+  };
   const legacyCountry = { id: 'GBR', name: 'Royaume-Uni (ancien quiz)' };
   const knownCountryId = id => countryById.has(id) || id === legacyCountry.id;
   const storageKey = 'atlas-club-europe-v1';
@@ -183,6 +215,14 @@
       [result[i], result[j]] = [result[j], result[i]];
     }
     return result;
+  }
+
+  function qcmChoices(id) {
+    const neighbors = (landNeighbors[id] || []).filter(neighborId => countryById.has(neighborId));
+    const neighborId = neighbors.length ? neighbors[Math.floor(Math.random() * neighbors.length)] : null;
+    const distractors = shuffle(countries.filter(country => country.id !== id && country.id !== neighborId))
+      .slice(0, neighborId ? 4 : 5);
+    return shuffle([countryById.get(id), ...(neighborId ? [countryById.get(neighborId)] : []), ...distractors]);
   }
 
   function normalizeCountryName(value) {
@@ -596,8 +636,7 @@
     freeAnswerSubmit.disabled = false;
     document.getElementById('question-number').textContent = `${String(countries.findIndex(country => country.id === id) + 1).padStart(2, '0')} / ${countries.length}`;
     if (questionMode === 'qcm') {
-      const distractors = shuffle(countries.filter(country => country.id !== id)).slice(0, 5);
-      const choices = shuffle([correct, ...distractors]);
+      const choices = qcmChoices(id);
       for (const [index, choice] of choices.entries()) {
         const button = document.createElement('button');
         button.type = 'button';

@@ -8,7 +8,7 @@ Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io
 
 Le bouton **Réglages** (engrenage) permet de choisir :
 
-- **QCM** : six noms distincts, un seul correct ;
+- **QCM** : six noms distincts, un seul correct. Parmi les cinq autres, un pays partage une frontière terrestre avec la bonne réponse lorsqu'un tel voisin est jouable ; les quatre autres sont tirés au hasard. Pour une île sans voisin terrestre dans le quiz, les cinq autres sont aléatoires ;
 - **Réponse libre** : saisir le nom du pays et valider avec Entrée ou le bouton. Les accents, articles, espaces, tirets et petites fautes de frappe sont tolérés. Le nom exact d'un autre pays reste une mauvaise réponse ;
 - **Découverte** : privilégier les pays jamais joués ; **Tous les pays** : tirer uniformément parmi les pays encore à jouer ; **À réviser** : privilégier ceux ratés dans les parties précédentes, avec plus de chances pour les plus difficiles. Si aucun pays raté n'est encore disponible, ce mode tire parmi les autres zones à jouer ;
 - **Mode chronométré** : activer un compte à rebours pour chaque question et choisir librement sa durée entre 1 et 3 600 secondes. Le temps restant apparaît dans le quiz. Si le temps expire, la question compte comme une erreur, le bon pays est révélé et l'on peut continuer normalement. Le chrono s'arrête dès qu'une réponse est donnée ou que la question est fermée ; il se met en pause pendant l'ouverture des réglages ou de l'historique.
@@ -44,6 +44,7 @@ Les polices Google Fonts sont facultatives : des polices locales de remplacement
 | `docs/ARCHITECTURE.md` | Règles techniques et points d'attention |
 | `CLAUDE.md` | Contexte court pour reprendre le travail avec un agent de code |
 | `tests/game-rules.cjs` | Vérification de la migration, des erreurs répétées, de la fin et de la nouvelle partie |
+| `tests/qcm-neighbors.cjs` | Vérification des frontières et des six propositions du QCM |
 
 Pour régénérer `map-data.js` à partir de la révision de Natural Earth épinglée dans le script :
 
@@ -61,9 +62,9 @@ Contours issus de [Natural Earth, Admin 0 Countries](https://www.naturalearthdat
 
 ## Vérification rapide
 
-Lancer d'abord `node tests/game-rules.cjs` pour contrôler la migration des anciennes sauvegardes, le tirage, la persistance et la fin de partie.
+Lancer `node tests/game-rules.cjs` et `node tests/qcm-neighbors.cjs` pour contrôler la partie, la persistance et les six propositions du QCM.
 
-1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses doivent apparaître, une seule étant correcte.
+1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses distinctes doivent apparaître, une seule étant correcte. Pour un pays avec frontières terrestres, au moins un distracteur doit être un voisin ; pour Chypre, l'Islande ou Malte, les cinq distracteurs sont aléatoires. Reposer plusieurs fois la question sur la Belgique pour vérifier que le voisin et l'ordre varient.
    Vérifier que l'Angleterre, l'Écosse, le pays de Galles et l'Irlande du Nord sont quatre zones distinctes et que l'Irlande n'est pas confondue avec l'Irlande du Nord.
 2. Donner une bonne réponse : le score gagne 10 points et le pays devient vert.
 3. Recharger : le score et le pays trouvé restent présents. Cliquer à nouveau sur ce pays, sur son éventuel repère ou l'activer au clavier ne doit pas ouvrir une question. Son nom doit apparaître au survol ou au toucher, sans permettre de le rejouer.
