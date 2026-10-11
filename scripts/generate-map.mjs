@@ -4,22 +4,23 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const sourceUrl = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_countries.geojson';
-const sourceText = process.argv[2]
-  ? fs.readFileSync(path.resolve(process.argv[2]), 'utf8')
-  : await (async () => {
-      try {
-        const response = await fetch(sourceUrl);
-        if (!response.ok) throw new Error(`Natural Earth download failed: HTTP ${response.status}`);
-        return response.text();
-      } catch (error) {
-        try {
-          return execFileSync('curl', ['--fail', '--location', '--silent', '--show-error', sourceUrl], { encoding: 'utf8', maxBuffer: 30_000_000 });
-        } catch (_) {
-          throw new Error(`Cannot download Natural Earth. Pass a local GeoJSON file as the first argument. Cause: ${error.message}`);
-        }
-      }
-    })();
-const source = JSON.parse(sourceText);
+const mapUnitsUrl = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_map_units.geojson';
+async function readSource(localFile, url) {
+  if (localFile) return fs.readFileSync(path.resolve(localFile), 'utf8');
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Natural Earth download failed: HTTP ${response.status}`);
+    return response.text();
+  } catch (error) {
+    try {
+      return execFileSync('curl', ['--fail', '--location', '--silent', '--show-error', url], { encoding: 'utf8', maxBuffer: 30_000_000 });
+    } catch (_) {
+      throw new Error(`Cannot download Natural Earth. Pass local country and map-unit GeoJSON files as arguments. Cause: ${error.message}`);
+    }
+  }
+}
+const source = JSON.parse(await readSource(process.argv[2], sourceUrl));
+const mapUnits = JSON.parse(await readSource(process.argv[3], mapUnitsUrl));
 const output = fileURLToPath(new URL('..', import.meta.url));
 fs.mkdirSync(output, { recursive: true });
 
@@ -41,7 +42,11 @@ const names = new Map(Object.entries({
   'Romania': 'Roumanie', 'Russia': 'Russie', 'San Marino': 'Saint-Marin',
   'Slovakia': 'Slovaquie', 'Slovenia': 'Slovénie', 'Spain': 'Espagne',
   'Sweden': 'Suède', 'Switzerland': 'Suisse', 'Turkey': 'Turquie',
-  'Ukraine': 'Ukraine', 'United Kingdom': 'Royaume-Uni', 'Vatican': 'Vatican'
+  'Ukraine': 'Ukraine', 'Vatican': 'Vatican'
+}));
+const ukNames = new Map(Object.entries({
+  England: 'Angleterre', Scotland: 'Écosse', Wales: 'Pays de Galles',
+  'Northern Ireland': 'Irlande du Nord'
 }));
 
 const bounds = { west: -14, east: 53, south: 31, north: 73 };
@@ -117,16 +122,24 @@ for (const feature of source.features) {
     countries.push({ id: feature.properties.ADM0_A3, name: names.get(name), d });
   }
 }
+for (const feature of mapUnits.features) {
+  if (feature.properties.ADMIN !== 'United Kingdom') continue;
+  const name = ukNames.get(feature.properties.GEOUNIT);
+  if (!name) continue;
+  const d = pathFor(feature, 0.5);
+  if (d) countries.push({ id: feature.properties.GU_A3, name, d });
+}
 countries.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-if (countries.length !== names.size) {
-  throw new Error(`Expected ${names.size} countries, generated ${countries.length}: ${countries.map(c => c.name).join(', ')}`);
+if (countries.length !== names.size + ukNames.size || new Set(countries.map(country => country.id)).size !== countries.length) {
+  throw new Error(`Expected ${names.size + ukNames.size} unique playable areas, generated ${countries.length}: ${countries.map(c => c.name).join(', ')}`);
 }
 
 const pins = [
   ['Andorre', 1.55, 42.55], ['Liechtenstein', 9.55, 47.15],
   ['Monaco', 7.42, 43.74], ['Saint-Marin', 12.45, 43.94],
   ['Vatican', 12.45, 41.90], ['Malte', 14.38, 35.94],
-  ['Luxembourg', 6.12, 49.75], ['Kosovo', 21.02, 42.60]
+  ['Luxembourg', 6.12, 49.75], ['Kosovo', 21.02, 42.60],
+  ['Pays de Galles', -3.65, 52.25], ['Irlande du Nord', -6.65, 54.62]
 ].map(([name, longitude, latitude]) => ({
   id: countries.find(country => country.name === name).id,
   x: +project([longitude, latitude])[0].toFixed(1),
