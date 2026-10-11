@@ -1,10 +1,10 @@
 # Europe à la carte
 
-Jeu de géographie en français pour reconnaître **51 pays d'Europe** sur une carte interactive. On peut répondre en choisissant parmi six noms ou en écrivant le nom du pays. Le jeu fonctionne dans un navigateur sur ordinateur et sur mobile.
+Jeu de géographie en français pour reconnaître **54 zones d'Europe** sur une carte interactive. Le Royaume-Uni est partagé en Angleterre, Écosse, pays de Galles et Irlande du Nord ; l'Irlande reste une réponse distincte. On peut répondre en choisissant parmi six noms ou en écrivant le nom du pays ou territoire. Le jeu fonctionne dans un navigateur sur ordinateur et sur mobile.
 
 ## Jouer
 
-Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io/quiz-carte-europe/), ou `index.html` dans un navigateur. Cliquer ou toucher un pays sur la carte. Les huit petits pays difficiles à toucher ont aussi un point circulaire. Par défaut, le bouton **Choisir un pays au hasard** privilégie les pays qui n'ont pas encore été trouvés.
+Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io/quiz-carte-europe/), ou `index.html` dans un navigateur. Cliquer ou toucher un pays sur la carte. Dix petites zones difficiles à toucher, dont le pays de Galles et l'Irlande du Nord, ont aussi un point circulaire. Par défaut, le bouton **Choisir un pays au hasard** privilégie les zones qui n'ont pas encore été trouvées.
 
 Le bouton **Réglages** (engrenage) permet de choisir :
 
@@ -17,7 +17,7 @@ Le choix des réglages est conservé dans ce navigateur et s'applique à la proc
 
 La carte se déplace en la faisant glisser et se zoome avec la molette, un pincement à deux doigts ou les boutons +/−. Au dézoom, un fond géographique prolonge l'Europe vers l'Atlantique, l'Afrique du Nord et l'Asie occidentale, sans afficher la carte du monde entière. Sur ordinateur, le bouton **Choisir un pays au hasard** se trouve entre **Mon atlas** et le quiz ; la question apparaît juste en dessous, à côté de la carte. La case **Zoom automatique sur le pays**, cochée par défaut, recentre la carte avec un léger agrandissement à chaque nouvelle question, sur ordinateur comme sur mobile. Ce choix est enregistré dans le navigateur. Sur mobile, le quiz apparaît sous **Mon atlas** et comprend un aperçu plus grand du pays sélectionné, avec davantage de contexte géographique.
 
-Une bonne réponse rapporte **10 points lors de la première identification du pays**, dans les deux modes. Après chaque réponse, une fenêtre animée verte ou rouge indique clairement le résultat et le bon pays. Cliquer ou toucher cette fenêtre lance une autre question ; le bouton **Un autre pays** reste disponible dans le quiz si la fenêtre est fermée avec Échap. Une mauvaise réponse laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur, avec un historique daté des réponses et des compteurs permanents de réussites et d'erreurs par pays. Le bouton **Historique** dans **Mon atlas** affiche les 51 pays classés par nombre d'erreurs, avec le nombre d'essais ; les dernières réponses sont consultables en bas de cette fenêtre. Le mode « À réviser » utilise les mêmes compteurs. Ces données restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Recommencer à zéro** efface aussi cet historique après confirmation, mais conserve les réglages.
+Une bonne réponse rapporte **10 points lors de la première identification du pays**, dans les deux modes. Après chaque réponse, une fenêtre animée verte ou rouge indique clairement le résultat et le bon pays. Cliquer ou toucher cette fenêtre lance une autre question ; le bouton **Un autre pays** reste disponible dans le quiz si la fenêtre est fermée avec Échap. Une mauvaise réponse laisse le pays disponible pour un nouvel essai. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression est enregistrée dans le `localStorage` du navigateur, avec un historique daté des réponses et des compteurs permanents de réussites et d'erreurs par pays. Le bouton **Historique** dans **Mon atlas** affiche les 54 zones jouables classées par nombre d'erreurs, avec le nombre d'essais ; les dernières réponses sont consultables en bas de cette fenêtre. Les anciennes statistiques du « Royaume-Uni » restent visibles comme ligne d'archive si elles existent, sans donner automatiquement la maîtrise des quatre nouveaux territoires. Le mode « À réviser » utilise les compteurs des zones jouables. Ces données restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Recommencer à zéro** efface aussi cet historique après confirmation, mais conserve les réglages.
 
 ## Lancer en local
 
@@ -50,17 +50,18 @@ Pour régénérer `map-data.js` à partir de la révision de Natural Earth épin
 node scripts/generate-map.mjs
 ```
 
-Le script accepte aussi un fichier GeoJSON local en premier argument, par exemple `node scripts/generate-map.mjs countries.geojson`. La source complète n'est pas conservée dans ce dépôt ; seul le fichier de carte préparé est publié.
+Le script accepte les deux fichiers GeoJSON locaux en arguments, par exemple `node scripts/generate-map.mjs countries.geojson map-units.geojson`. Sans arguments, il télécharge les deux sources à la révision épinglée. Les sources complètes ne sont pas conservées dans ce dépôt ; seul le fichier de carte préparé est publié.
 
 ## Périmètre et source des données
 
-La carte comprend les micro-États, le Kosovo et plusieurs pays transcontinentaux, notamment la Russie, la Turquie, le Kazakhstan et les pays du Caucase. Les territoires dépendants ne sont pas proposés comme réponses. Les frontières et la définition de l'Europe varient selon les sources.
+La carte comprend les micro-États, le Kosovo et plusieurs pays transcontinentaux, notamment la Russie, la Turquie, le Kazakhstan et les pays du Caucase. Le Royaume-Uni, État souverain, est remplacé dans le quiz par ses quatre territoires constitutifs : Angleterre, Écosse, pays de Galles et Irlande du Nord. Les autres territoires dépendants ne sont pas proposés comme réponses. Les frontières et la définition de l'Europe varient selon les sources.
 
-Contours issus de [Natural Earth, Admin 0 Countries, échelle 1:10m](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/) (données du domaine public). Le script épingle la révision `ca96624a56bd078437bca8184e78163e5039ad19` du dépôt source.
+Contours issus de [Natural Earth, Admin 0 Countries](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/) et [Admin 0 Map Units](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-details/), échelle 1:10m (données du domaine public). Le script épingle la révision `ca96624a56bd078437bca8184e78163e5039ad19` du dépôt source. L'[Office for National Statistics](https://service-manual.ons.gov.uk/content/language/countries-and-regions) énumère ces quatre composantes du Royaume-Uni.
 
 ## Vérification rapide
 
 1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses doivent apparaître, une seule étant correcte.
+   Vérifier que l'Angleterre, l'Écosse, le pays de Galles et l'Irlande du Nord sont quatre zones distinctes et que l'Irlande n'est pas confondue avec l'Irlande du Nord.
 2. Donner une bonne réponse : le score gagne 10 points et le pays devient vert.
 3. Recharger : le score et le pays trouvé restent présents.
    Survoler ce pays : son nom doit apparaître dans la carte ; quitter le pays : l'étiquette disparaît. Sur mobile, le toucher une fois montre son nom sans ouvrir le quiz ; le toucher une seconde fois ouvre le quiz. Un pays non découvert n'affiche pas de nom.
