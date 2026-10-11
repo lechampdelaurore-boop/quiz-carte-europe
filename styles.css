@@ -59,13 +59,15 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .country.selected { fill: #e5a96f; stroke: #945731; stroke-width: 2.7; }
 .country.wrong { fill: var(--wrong); }
 .country[aria-disabled="true"], .pin-group[aria-disabled="true"] { cursor: default; }
-.pin-halo { fill: #fffefa; stroke: #264c47; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.pin-core { fill: #216b61; }
+.pin-hit { fill: transparent; stroke: none; pointer-events: all; }
+.pin-halo { fill: #fffefa; stroke: #264c47; stroke-width: 1.4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.pin-core { fill: #216b61; pointer-events: none; }
 .pin-mastered .pin-core { fill: #65a56c; }
 .pin-missed .pin-core { fill: #bc786a; }
 .pin-selected .pin-core { fill: #dc9158; }
-.pin-group { cursor: pointer; }
-.pin-group:hover .pin-halo, .pin-group:focus .pin-halo { stroke: #d88253; stroke-width: 3; }
+.pin-group { cursor: pointer; outline: none; }
+.pin-group:hover .pin-halo, .pin-group:focus-visible .pin-halo { stroke: #d88253; stroke-width: 2; }
+.pin-group:focus-visible .pin-hit { stroke: #d88253; stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 .map-footer { flex: none; min-height: 34px; display: flex; align-items: center; gap: 15px; padding: 6px 18px; color: var(--muted); font-size: 10px; }
 .legend-dot { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; border: 1px solid #789089; border-radius: 50%; }
 .legend-dot.unplayed { background: var(--land); }

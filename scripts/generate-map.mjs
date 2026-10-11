@@ -134,16 +134,18 @@ if (countries.length !== names.size + ukNames.size || new Set(countries.map(coun
   throw new Error(`Expected ${names.size + ukNames.size} unique playable areas, generated ${countries.length}: ${countries.map(c => c.name).join(', ')}`);
 }
 
+// Visible markers are reserved for shapes that are only a few pixels wide at the initial zoom.
+// Luxembourg needs a larger touch target, but its outline remains visible without a marker.
 const pins = [
   ['Andorre', 1.55, 42.55], ['Liechtenstein', 9.55, 47.15],
   ['Monaco', 7.42, 43.74], ['Saint-Marin', 12.45, 43.94],
   ['Vatican', 12.45, 41.90], ['Malte', 14.38, 35.94],
-  ['Luxembourg', 6.12, 49.75], ['Kosovo', 21.02, 42.60],
-  ['Pays de Galles', -3.65, 52.25], ['Irlande du Nord', -6.65, 54.62]
-].map(([name, longitude, latitude]) => ({
+  ['Luxembourg', 6.12, 49.75, false]
+].map(([name, longitude, latitude, visible = true]) => ({
   id: countries.find(country => country.name === name).id,
   x: +project([longitude, latitude])[0].toFixed(1),
-  y: +project([longitude, latitude])[1].toFixed(1)
+  y: +project([longitude, latitude])[1].toFixed(1),
+  visible
 }));
 
 const [contextLeft, contextTop] = project([contextBounds.west, contextBounds.north]);

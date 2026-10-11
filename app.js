@@ -36,6 +36,7 @@
   const resultDialog = document.getElementById('result-dialog');
   const resultAdvance = document.getElementById('result-advance');
   const nodes = new Map();
+  const pinGroups = [];
   let selectedId = null;
   let answered = false;
   let questionMode = 'qcm';
@@ -370,32 +371,46 @@
     if (fromTouch) tooltipTimer = setTimeout(hideCountryTooltip, 4000);
   }
 
-  function registerCountry(node, id) {
+  function nearestPinId(clientX, clientY) {
+    const rect = svg.getBoundingClientRect();
+    return map.pins.reduce((nearest, pin) => {
+      const x = rect.left + pin.x * rect.width / map.width;
+      const y = rect.top + pin.y * rect.height / map.height;
+      const distance = (x - clientX) ** 2 + (y - clientY) ** 2;
+      return distance < nearest.distance ? { id: pin.id, distance } : nearest;
+    }, { id: null, distance: Infinity }).id;
+  }
+
+  function registerCountry(node, id, isPin = false) {
+    const pointerCountry = event => isPin ? nearestPinId(event.clientX, event.clientY) : id;
     node.setAttribute('tabindex', '0');
     node.setAttribute('role', 'button');
     node.setAttribute('aria-label', `Zone de pays à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`);
     node.addEventListener('click', event => {
       if (suppressClick) { suppressClick = false; return; }
+      const targetId = isPin && event.detail !== 0 ? pointerCountry(event) : id;
       const fromTouch = event.pointerType === 'touch' || Date.now() - lastTouchAt < 700;
-      if (hasFound(id)) {
-        showCountryTooltip(id, event.clientX, event.clientY, fromTouch);
+      if (hasFound(targetId)) {
+        showCountryTooltip(targetId, event.clientX, event.clientY, fromTouch);
         return;
       }
       hideCountryTooltip();
-      openQuestion(id);
+      openQuestion(targetId);
     });
     node.addEventListener('pointerenter', event => {
       if (event.pointerType !== 'touch' && !pointerDrag?.moved) {
-        showCountryTooltip(id, event.clientX, event.clientY);
+        showCountryTooltip(pointerCountry(event), event.clientX, event.clientY);
       }
     });
     node.addEventListener('pointermove', event => {
-      if (event.pointerType !== 'touch' && tooltipCountryId === id && !tooltipFromTouch && !pointerDrag?.moved) {
-        positionCountryTooltip(event.clientX, event.clientY);
+      if (event.pointerType !== 'touch' && !tooltipFromTouch && !pointerDrag?.moved) {
+        const targetId = pointerCountry(event);
+        if (tooltipCountryId === targetId) positionCountryTooltip(event.clientX, event.clientY);
+        else if (isPin) { hideCountryTooltip(); showCountryTooltip(targetId, event.clientX, event.clientY); }
       }
     });
     node.addEventListener('pointerleave', event => {
-      if (event.pointerType !== 'touch' && tooltipCountryId === id && !tooltipFromTouch) hideCountryTooltip();
+      if (event.pointerType !== 'touch' && (isPin || tooltipCountryId === id) && !tooltipFromTouch) hideCountryTooltip();
     });
     node.addEventListener('focus', () => {
       const rect = node.getBoundingClientRect();
@@ -432,9 +447,13 @@
     const pinLayer = element('g');
     for (const pin of map.pins) {
       const group = element('g', { class: 'pin-group', 'data-country': pin.id });
-      group.append(element('circle', { cx: pin.x, cy: pin.y, r: 13, class: 'pin-halo' }));
-      group.append(element('circle', { cx: pin.x, cy: pin.y, r: 5, class: 'pin-core' }));
-      registerCountry(group, pin.id);
+      group.append(element('circle', { cx: pin.x, cy: pin.y, class: 'pin-hit' }));
+      if (pin.visible !== false) {
+        group.append(element('circle', { cx: pin.x, cy: pin.y, class: 'pin-halo' }));
+        group.append(element('circle', { cx: pin.x, cy: pin.y, class: 'pin-core' }));
+      }
+      registerCountry(group, pin.id, true);
+      pinGroups.push(group);
       pinLayer.append(group);
     }
     svg.append(pinLayer);
@@ -459,7 +478,7 @@
     }
     miniMap.querySelector('.preview-pin')?.remove();
     const pin = map.pins.find(item => item.id === id);
-    if (pin) miniMap.append(element('circle', { cx: pin.x, cy: pin.y, r: 9, class: 'preview-pin' }));
+    if (pin && pin.visible !== false) miniMap.append(element('circle', { cx: pin.x, cy: pin.y, r: 9, class: 'preview-pin' }));
     const shape = nodes.get(id).find(node => node.tagName.toLowerCase() === 'path');
     const box = shape.getBBox();
     const left = Math.max(0, box.x), right = Math.min(map.width, box.x + box.width);
@@ -716,6 +735,12 @@
   function renderMap() {
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
+    const mapUnitsPerPixel = map.width / width;
+    for (const group of pinGroups) {
+      group.querySelector('.pin-hit').setAttribute('r', (18 * mapUnitsPerPixel).toFixed(2));
+      group.querySelector('.pin-halo')?.setAttribute('r', (5 * mapUnitsPerPixel).toFixed(2));
+      group.querySelector('.pin-core')?.setAttribute('r', (2 * mapUnitsPerPixel).toFixed(2));
+    }
     const extent = map.contextExtent;
     const leftLimit = viewport.clientWidth - (viewport.clientWidth - width) / 2 - extent.right / map.width * width;
     const rightLimit = -(viewport.clientWidth - width) / 2 - extent.left / map.width * width;
