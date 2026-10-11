@@ -7,8 +7,8 @@
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
   <link rel="stylesheet" href="styles.css?v=20261011-mobile-preview">
-  <script defer src="map-data.js"></script>
-  <script defer src="app.js?v=20261011-mobile-preview"></script>
+  <script defer src="map-data.js?v=20261011-uk-four"></script>
+  <script defer src="app.js?v=20261011-uk-four"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -41,10 +41,10 @@
 
         <div class="side-column">
           <aside class="progress-card" aria-labelledby="progress-heading">
-            <div class="progress-heading"><div><span class="section-kicker">02 / TON PARCOURS</span><h2 id="progress-heading">Mon atlas</h2></div><div class="progress-ring" id="progress-ring"><div><strong id="mastered-count">0</strong><span>/ 51</span></div></div></div>
+            <div class="progress-heading"><div><span class="section-kicker">02 / TON PARCOURS</span><h2 id="progress-heading">Mon atlas</h2></div><div class="progress-ring" id="progress-ring"><div><strong id="mastered-count">0</strong><span>/ 54</span></div></div></div>
             <p class="progress-caption" id="progress-caption">Ton voyage commence ici.</p>
             <div class="stats-grid"><div><span>POINTS</span><strong id="score">0</strong></div><div><span>SÉRIE</span><strong id="streak">0</strong></div></div>
-            <div class="progress-track" role="progressbar" aria-label="Pays reconnus" aria-valuemin="0" aria-valuemax="51" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
+            <div class="progress-track" role="progressbar" aria-label="Pays reconnus" aria-valuemin="0" aria-valuemax="54" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
             <div class="progress-actions"><span class="save-note">✓ Sauvegardé sur cet appareil</span><div class="progress-links"><button class="history-button" id="history-button" type="button">Historique</button><button class="reset-button" id="reset-button" type="button">Recommencer</button></div></div>
           </aside>
 
@@ -85,7 +85,7 @@
     <fieldset>
       <legend>Quels pays tirer au hasard ?</legend>
       <label class="setting-option"><input type="radio" name="country-selection" value="discover" checked><span><strong>Découverte</strong><small>Pays pas encore trouvés en priorité.</small></span></label>
-      <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les 51 pays.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les 54 pays et territoires du jeu.</small></span></label>
       <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays déjà ratés, avec priorité aux plus difficiles.</small></span></label>
     </fieldset>
     <fieldset>
