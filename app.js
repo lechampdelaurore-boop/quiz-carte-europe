@@ -4,6 +4,8 @@
   const map = window.EUROPE_MAP;
   const countries = map.countries;
   const countryById = new Map(countries.map(country => [country.id, country]));
+  const legacyCountry = { id: 'GBR', name: 'Royaume-Uni (ancien quiz)' };
+  const knownCountryId = id => countryById.has(id) || id === legacyCountry.id;
   const storageKey = 'atlas-club-europe-v1';
   const settingsKey = 'atlas-club-settings-v1';
   const historyLimit = 5000;
@@ -99,7 +101,7 @@
         const progress = emptyProgress();
         progress.score = count(saved.score);
         progress.streak = count(saved.streak);
-        for (const country of countries) {
+        for (const country of [...countries, legacyCountry]) {
           const old = saved.stats[country.id];
           if (!old || typeof old !== 'object') continue;
           const attempts = count(old.attempts);
@@ -118,8 +120,8 @@
           };
         }
         if (Array.isArray(saved.history)) {
-          const validHistory = saved.history.filter(item => item && countryById.has(item.countryId)
-            && (countryById.has(item.chosenId) || (item.chosenId === null && (item.mode === 'open' || item.timedOut === true)))
+          const validHistory = saved.history.filter(item => item && knownCountryId(item.countryId)
+            && (knownCountryId(item.chosenId) || (item.chosenId === null && (item.mode === 'open' || item.timedOut === true)))
             && typeof item.correct === 'boolean'
             && typeof item.at === 'string');
           progress.history = validHistory.slice(-historyLimit);
@@ -243,7 +245,7 @@
 
   const historyDate = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
   function renderHistory() {
-    const ordered = [...countries].sort((first, second) =>
+    const ordered = [...countries, ...(progress.stats.GBR ? [legacyCountry] : [])].sort((first, second) =>
       (progress.stats[second.id]?.wrongAttempts || 0) - (progress.stats[first.id]?.wrongAttempts || 0)
       || first.name.localeCompare(second.name, 'fr'));
     const totalErrors = ordered.reduce((total, country) => total + (progress.stats[country.id]?.wrongAttempts || 0), 0);
@@ -289,7 +291,7 @@
       const date = new Date(item.at);
       const when = Number.isNaN(date.getTime()) ? '' : ` · ${historyDate.format(date)}`;
       const outcome = item.timedOut ? 'temps écoulé' : item.correct ? 'juste' : 'faux';
-      entry.textContent = `${countryById.get(item.countryId).name} — ${outcome}${when}`;
+      entry.textContent = `${countryById.get(item.countryId)?.name || legacyCountry.name} — ${outcome}${when}`;
       return entry;
     });
     if (!recent.length) {
