@@ -17,11 +17,13 @@ Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` tél�
 ## Cycle d'une question
 
 1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays. Un clic direct sur la carte ignore le filtre de tirage.
-2. `openQuestion` fige le mode de réponse pour cette question. En QCM, il tire cinq autres pays distincts et mélange les six choix. En réponse libre, il affiche un formulaire sans noms proposés.
-3. `submitAnswer` accepte une seule réponse, révèle la bonne, met à jour la progression et ouvre `result-dialog`, avec une animation différente selon le résultat. Un formulaire vide ne compte pas comme une tentative.
+2. `openQuestion` fige le mode de réponse et l'état du chronomètre pour cette question. En QCM, il tire cinq autres pays distincts et mélange les six choix. En réponse libre, il affiche un formulaire sans noms proposés. Si le mode chronométré est actif, un nouveau décompte commence avec la durée enregistrée.
+3. `submitAnswer` accepte une seule réponse, arrête le décompte, révèle la bonne, met à jour la progression et ouvre `result-dialog`, avec une animation différente selon le résultat. Un formulaire vide ne compte pas comme une tentative. À zéro, `tickQuestionTimer` appelle `submitAnswer(null, null, true)` : l'expiration compte comme une erreur, sans choix fabriqué, et reçoit `timedOut: true` dans l'historique.
 4. Le bouton dans la fenêtre de résultat et « Un autre pays » appellent tous deux `nextQuestion`, qui applique le filtre et la pondération choisis dans les réglages. Échap ferme la fenêtre de résultat et rend le bouton du quiz accessible.
 
-Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`). Ils s'appliquent à la prochaine question et ne sont pas effacés par « Recommencer à zéro ». Le tirage « Découverte » utilise les pays non trouvés, puis tous les pays si l'atlas est complet. « Tous les pays » est uniforme. « À réviser » utilise les pays ayant `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. Sans erreur enregistrée, « À réviser » reprend le tirage « Découverte ». Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
+Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`, `timedMode: boolean`, `timerSeconds: 1..3600`). Les anciennes sauvegardes de réglages chargent le mode chronométré désactivé et une durée par défaut de 30 secondes. Une saisie invalide n'est pas enregistrée et empêche la fermeture des réglages tant que le mode est activé. Les réglages s'appliquent à la prochaine question et ne sont pas effacés par « Recommencer à zéro ». Le tirage « Découverte » utilise les pays non trouvés, puis tous les pays si l'atlas est complet. « Tous les pays » est uniforme. « À réviser » utilise les pays ayant `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. Sans erreur enregistrée, « À réviser » reprend le tirage « Découverte ». Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
+
+Le décompte utilise une échéance `Date.now()` recalculée à chaque intervalle de 250 ms, pour éviter que les retards d'intervalle rallongent la question. Il s'arrête à la réponse, à la fermeture ou au remplacement de la question. L'ouverture des dialogues Réglages et Historique le met en pause ; leur fermeture reprend le temps restant. Le réglage peut changer pendant la pause, mais la question en cours garde son mode initial. Sans mode chronométré, aucun intervalle n'est lancé.
 
 Pour la réponse libre, `normalizeCountryName` ignore majuscules, accents, articles initiaux, ponctuation et espaces multiples. `editDistance` compte l'échange de deux lettres voisines comme une seule faute. Un nom de quatre caractères ou moins doit être exact ; de cinq à neuf caractères, une faute est permise ; au-delà, deux fautes. `matchTypedCountry` cherche le pays reconnu le plus proche parmi les 51 noms et les variantes explicites « République tchèque » et « Bélarus ». Une égalité entre pays est refusée, et taper exactement le nom d'un autre pays reste une erreur. Le nom saisi est limité à 80 caractères.
 
@@ -36,33 +38,36 @@ Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVers
   "schemaVersion": 3,
   "stats": {
     "FRA": {
-      "attempts": 3,
+      "attempts": 4,
       "mastered": true,
       "correctAttempts": 1,
-      "wrongAttempts": 1,
+      "wrongAttempts": 2,
       "legacyAttempts": 1,
-      "lastAttemptAt": "2026-10-11T12:00:00.000Z"
+      "lastAttemptAt": "2026-10-11T13:00:00.000Z"
     }
   },
   "score": 10,
-  "streak": 1,
+  "streak": 0,
   "history": [
     { "countryId": "FRA", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z", "mode": "qcm" },
-    { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z", "mode": "open", "enteredText": "Frnace" }
+    { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z", "mode": "open", "enteredText": "Frnace" },
+    { "countryId": "FRA", "chosenId": null, "correct": false, "at": "2026-10-11T13:00:00.000Z", "mode": "qcm", "timedOut": true }
   ],
   "historyDropped": 0
 }
 ```
 
-`stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays déjà trouvé au moins une fois. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` conservent leurs règles actuelles. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix reconnu, le résultat, la date UTC et le mode ; les événements sont dans l'ordre des réponses. En mode libre, `enteredText` conserve le texte saisi ; `chosenId` vaut `null` si aucun pays n'a été reconnu. Les événements créés avant la version 3 peuvent ne pas avoir de champ `mode` : ils proviennent du QCM.
+`stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays déjà trouvé au moins une fois. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` conservent leurs règles actuelles. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix reconnu, le résultat, la date UTC et le mode ; les événements sont dans l'ordre des réponses. En mode libre, `enteredText` conserve le texte saisi ; `chosenId` vaut `null` si aucun pays n'a été reconnu. Une expiration a `chosenId: null` et `timedOut: true`, même en QCM. Les événements créés avant la version 3 peuvent ne pas avoir de champ `mode` : ils proviennent du QCM.
 
 Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Le résultat des tentatives antérieures à l'historique ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés.
 
 « Recommencer à zéro » efface aussi les statistiques et l'historique. Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a ni compte ni synchronisation entre appareils : deux personnes dans le même profil de navigateur partagent cette sauvegarde.
 
+La fenêtre Historique lit directement `stats[*].wrongAttempts`, qui reste exact même quand les événements les plus anciens ont quitté la liste limitée à 5 000. Elle montre les 51 pays triés par erreurs décroissantes, le nombre d'essais et, dans une section repliée, les 20 réponses les plus récentes. Aucun nouveau format de progression ni recalcul à partir des seuls événements n'est nécessaire.
+
 ## Interface et accessibilité
 
-Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Le nom d'un pays non découvert ne figure jamais dans son étiquette accessible. Dès qu'il est trouvé, son étiquette accessible donne son nom, et `map-tooltip` l'affiche au survol ou au focus. Sur écran tactile, un premier toucher sur un pays trouvé affiche l'étiquette pendant quatre secondes sans ouvrir le quiz ; un second toucher sur le même pays ouvre le quiz. Déplacement, zoom et sélection d'un autre pays masquent l'étiquette. Les huit points suivent les mêmes règles que les tracés. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages » et la fenêtre de résultat sont des dialogues modaux natifs, accessibles au clavier. Le résultat est aussi annoncé par du texte ; les animations sont désactivées avec `prefers-reduced-motion: reduce`.
+Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Le nom d'un pays non découvert ne figure jamais dans son étiquette accessible. Dès qu'il est trouvé, son étiquette accessible donne son nom, et `map-tooltip` l'affiche au survol ou au focus. Sur écran tactile, un premier toucher sur un pays trouvé affiche l'étiquette pendant quatre secondes sans ouvrir le quiz ; un second toucher sur le même pays ouvre le quiz. Déplacement, zoom et sélection d'un autre pays masquent l'étiquette. Les huit points suivent les mêmes règles que les tracés. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages », l'historique et la fenêtre de résultat sont des dialogues modaux natifs, accessibles au clavier. Le temps restant utilise `role="timer"` sans annonce vocale chaque seconde. Le résultat est aussi annoncé par du texte ; les animations sont désactivées avec `prefers-reduced-motion: reduce`.
 
 Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Le bouton de tirage au hasard se trouve entre « Mon atlas » et le quiz. Sur mobile, les blocs se superposent et la page peut défiler. Les huit points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
 
