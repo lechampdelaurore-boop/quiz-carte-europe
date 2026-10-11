@@ -427,8 +427,9 @@
     const top = Math.max(0, box.y), bottom = Math.min(map.height, box.y + box.height);
     const centerX = pin ? pin.x : (left + right) / 2;
     const centerY = pin ? pin.y : (top + bottom) / 2;
-    const span = Math.min(690, Math.max(240, (right - left) * 1.7, (bottom - top) * 3.2));
-    const viewHeight = span / 2.8;
+    const span = Math.min(790, Math.max(275, (right - left) * 1.9, (bottom - top) * 3.6));
+    const aspectRatio = miniMap.clientWidth / miniMap.clientHeight || 2.8;
+    const viewHeight = span / aspectRatio;
     miniMap.setAttribute('viewBox', `${centerX - span / 2} ${centerY - viewHeight / 2} ${span} ${viewHeight}`);
   }
 
@@ -522,7 +523,6 @@
     feedback.className = 'feedback';
     nextButton.hidden = true;
     const correct = countryById.get(id);
-    updateMiniMap(id);
     answers.replaceChildren();
     answers.hidden = questionMode !== 'qcm';
     freeAnswerForm.hidden = questionMode !== 'open';
@@ -548,8 +548,9 @@
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
+    updateMiniMap(id);
     startQuestionTimer();
-    if (autoZoom.checked && !window.matchMedia('(max-width: 850px)').matches) focusCountry(id);
+    if (autoZoom.checked) focusCountry(id);
     updateUI();
     if (questionMode === 'open') freeAnswerInput.focus();
     else answers.querySelector('button')?.focus();
