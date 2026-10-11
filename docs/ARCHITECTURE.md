@@ -16,59 +16,69 @@ Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` tél�
 
 ## Cycle d'une question
 
-1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays encore absent de `roundAnswered`. Un clic direct sur la carte ignore le filtre de tirage, mais jamais ce verrou de partie.
+1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays encore absent de `currentGame.foundIds`. Un clic direct sur la carte ignore le filtre de tirage, mais pas la fin de partie.
 2. `openQuestion` fige le mode de réponse et l'état du chronomètre pour cette question. En QCM, il tire cinq autres pays distincts et mélange les six choix. En réponse libre, il affiche un formulaire sans noms proposés. Si le mode chronométré est actif, un nouveau décompte commence avec la durée enregistrée.
-3. `submitAnswer` accepte une seule réponse, ajoute le pays à `roundAnswered`, arrête le décompte, révèle la bonne, met à jour la progression et ouvre `result-dialog`, avec une animation différente selon le résultat. Un formulaire vide ou une question fermée avant réponse ne consomme pas le pays. À zéro, `tickQuestionTimer` appelle `submitAnswer(null, null, true)` : l'expiration compte comme une erreur, sans choix fabriqué, et reçoit `timedOut: true` dans l'historique.
-4. Le bouton dans la fenêtre de résultat et « Un autre pays » appellent tous deux `nextQuestion`, qui applique le filtre et la pondération choisis dans les réglages. Échap ferme la fenêtre de résultat et rend le bouton du quiz accessible.
+3. `submitAnswer` accepte une seule réponse par ouverture de question, arrête le décompte, révèle la bonne, met à jour la progression et ouvre `result-dialog`, avec une animation différente selon le résultat. Une bonne réponse ajoute le pays à `currentGame.foundIds` ; une erreur incrémente `currentGame.errors` et `stats[id].wrongAttempts`, mais le pays reste jouable autant de fois que nécessaire. Un formulaire vide ou une question fermée avant réponse ne compte pas comme tentative. À zéro, `tickQuestionTimer` appelle `submitAnswer(null, null, true)` : l'expiration compte comme une erreur, sans choix fabriqué, et reçoit `timedOut: true` dans l'historique.
+4. Le bouton dans la fenêtre de résultat et « Un autre pays » appellent tous deux `nextQuestion`, qui applique le filtre et la pondération choisis dans les réglages. Échap ferme la fenêtre de résultat et rend le bouton du quiz accessible. Après la dernière bonne réponse, ces commandes affichent le bilan final ; aucune autre question ne s'ouvre avant « Nouvelle partie ».
 
-Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`, `timedMode: boolean`, `timerSeconds: 1..3600`). Les anciennes sauvegardes de réglages chargent le mode chronométré désactivé et une durée par défaut de 30 secondes. Une saisie invalide n'est pas enregistrée et empêche la fermeture des réglages tant que le mode est activé. Les réglages s'appliquent à la prochaine question et ne sont pas effacés par « Recommencer ». Tous les modes tirent uniquement les pays absents de `roundAnswered`. « Découverte » privilégie les zones sans tentative historique (`attempts === 0`) puis revient aux autres pays non joués ; « Tous les pays » tire uniformément parmi tous les pays non joués. « À réviser » retient ceux dont `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. S'il n'y a plus de pays raté disponible, le tirage reprend les autres pays non joués. Quand tous ont été joués, le bouton aléatoire est désactivé. Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
+Les réglages sont conservés sous `atlas-club-settings-v1` (`answerMode: "qcm" | "open"`, `countrySelection: "discover" | "all" | "review"`, `timedMode: boolean`, `timerSeconds: 1..3600`). Les anciennes sauvegardes de réglages chargent le mode chronométré désactivé et une durée par défaut de 30 secondes. Une saisie invalide n'est pas enregistrée et empêche la fermeture des réglages tant que le mode est activé. Les réglages s'appliquent à la prochaine question et ne sont pas effacés par « Nouvelle partie ». Tous les modes tirent uniquement les pays absents de `currentGame.foundIds`. « Découverte » privilégie les zones sans tentative historique (`attempts === 0`) puis revient aux autres pays non trouvés ; « Tous les pays » tire uniformément parmi tous les pays non trouvés. « À réviser » retient ceux dont `wrongAttempts > 0` ; leur poids est `1 + min(6, wrongAttempts) + 4 × wrongAttempts / (correctAttempts + wrongAttempts)`. Le dernier pays tiré est écarté quand le groupe en contient plusieurs. S'il n'y a plus de pays raté disponible, le tirage reprend les autres pays non trouvés. Ces trois modes changent l'ordre des questions, pas la cible finale de 54 pays trouvés. Quand tous sont trouvés, le bouton aléatoire est désactivé. Les anciennes tentatives dont le résultat est inconnu ne sont pas utilisées dans cette pondération.
 
 Le décompte utilise une échéance `Date.now()` recalculée à chaque intervalle de 250 ms, pour éviter que les retards d'intervalle rallongent la question. Il s'arrête à la réponse, à la fermeture ou au remplacement de la question. L'ouverture des dialogues Réglages et Historique le met en pause ; leur fermeture reprend le temps restant. Le réglage peut changer pendant la pause, mais la question en cours garde son mode initial. Sans mode chronométré, aucun intervalle n'est lancé.
 
 Pour la réponse libre, `normalizeCountryName` ignore majuscules, accents, articles initiaux, ponctuation et espaces multiples. `editDistance` compte l'échange de deux lettres voisines comme une seule faute. Un nom de quatre caractères ou moins doit être exact ; de cinq à neuf caractères, une faute est permise ; au-delà, deux fautes. `matchTypedCountry` cherche la zone reconnue la plus proche parmi les 54 noms et les variantes explicites « République tchèque » et « Bélarus ». Une égalité entre zones est refusée, et taper exactement le nom d'une autre zone reste une erreur. Le nom saisi est limité à 80 caractères.
 
-Une bonne réponse rapporte 10 points dans la partie. Les erreurs remettent la série à zéro. Le pourcentage de l'atlas correspond au nombre de zones trouvées dans la partie divisé par 54. Chaque zone devient indisponible après sa première réponse, juste, fausse ou hors délai ; elle redevient jouable à la prochaine partie. Une question fermée sans réponse reste disponible.
+Une bonne réponse rapporte 10 points dans la partie. Les erreurs remettent la série à zéro. Le pourcentage de l'atlas correspond au nombre de zones trouvées dans la partie divisé par 54. Une zone devient indisponible seulement après une bonne réponse ; une erreur ou une expiration permet de la retenter dans la même partie. Une question fermée sans réponse reste disponible. La partie se termine dès que les 54 zones ont été trouvées.
 
 ## Sauvegarde
 
-Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVersion: 4` :
+Clé `localStorage` : `atlas-club-europe-v1`. Le format actuel porte `schemaVersion: 5` :
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
+  "currentGame": {
+    "foundIds": ["FRA"],
+    "missedIds": ["ROU"],
+    "errors": 2,
+    "score": 10,
+    "streak": 0
+  },
   "stats": {
     "FRA": {
       "attempts": 4,
-      "mastered": true,
       "correctAttempts": 1,
       "wrongAttempts": 2,
       "legacyAttempts": 1,
       "lastAttemptAt": "2026-10-11T13:00:00.000Z"
+    },
+    "ROU": {
+      "attempts": 2,
+      "correctAttempts": 0,
+      "wrongAttempts": 2,
+      "legacyAttempts": 0,
+      "lastAttemptAt": "2026-10-11T14:00:00.000Z"
     }
   },
-  "roundAnswered": ["FRA"],
-  "score": 10,
-  "streak": 0,
   "history": [
-    { "countryId": "FRA", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z", "mode": "qcm" },
+    { "countryId": "ROU", "chosenId": "DEU", "correct": false, "at": "2026-10-11T11:00:00.000Z", "mode": "qcm" },
     { "countryId": "FRA", "chosenId": "FRA", "correct": true, "at": "2026-10-11T12:00:00.000Z", "mode": "open", "enteredText": "Frnace" },
-    { "countryId": "FRA", "chosenId": null, "correct": false, "at": "2026-10-11T13:00:00.000Z", "mode": "qcm", "timedOut": true }
+    { "countryId": "ROU", "chosenId": null, "correct": false, "at": "2026-10-11T14:00:00.000Z", "mode": "qcm", "timedOut": true }
   ],
   "historyDropped": 0
 }
 ```
 
-`roundAnswered` contient les identifiants déjà répondus dans la partie active et persiste au rechargement. `stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique, et `mastered` pour un pays trouvé dans la partie active. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. `score` et `streak` sont propres à la partie. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix reconnu, le résultat, la date UTC et le mode ; les événements sont dans l'ordre des réponses. En mode libre, `enteredText` conserve le texte saisi ; `chosenId` vaut `null` si aucun pays n'a été reconnu. Une expiration a `chosenId: null` et `timedOut: true`, même en QCM. Les événements créés avant la version 3 peuvent ne pas avoir de champ `mode` : ils proviennent du QCM.
+`currentGame` persiste au rechargement : `foundIds` contient les zones correctement trouvées, `missedIds` celles ratées dans cette partie, `errors` le nombre total de mauvaises réponses ou expirations, `score` et `streak` le score et la série. `stats` contient les cumuls permanents par pays : `attempts` pour toutes les réponses, `correctAttempts` et `wrongAttempts` pour les réponses connues, et `legacyAttempts` pour les tentatives faites avant l'ajout de l'historique. `lastAttemptAt` est la date UTC ISO 8601 de la dernière réponse connue, ou `null`. Une réponse crée un seul événement dans `history`, avec le pays demandé, le choix reconnu, le résultat, la date UTC et le mode ; les événements sont dans l'ordre des réponses. En mode libre, `enteredText` conserve le texte saisi ; `chosenId` vaut `null` si aucun pays n'a été reconnu. Une expiration a `chosenId: null` et `timedOut: true`, même en QCM. Les événements créés avant la version 3 peuvent ne pas avoir de champ `mode` : ils proviennent du QCM.
 
-Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Si `roundAnswered` manque, les pays avec au moins une tentative antérieure sont considérés comme déjà joués dans la partie actuelle. Les statistiques et événements `GBR` de l'ancien quiz sont conservés comme archive, sans être attribués à une des quatre nouvelles zones ; le score gagné auparavant reste acquis. `GBR` n'est plus proposé et ne compte plus dans la progression sur 54. Le résultat des tentatives antérieures à l'historique ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés.
+Au chargement, les anciennes sauvegardes sous la même clé sont normalisées sans perdre score, série, pays trouvés ou nombre de tentatives. Pour une sauvegarde v4, les anciens `stats[id].mastered` alimentent `foundIds` ; les autres identifiants de `roundAnswered` alimentent `missedIds` et restent rejouables. Pour les sauvegardes plus anciennes sans `roundAnswered`, la migration existante reconstruit d'abord cet état depuis les tentatives. Les statistiques et événements `GBR` de l'ancien quiz sont conservés comme archive, sans être attribués à une des quatre nouvelles zones ; le score gagné auparavant reste acquis. `GBR` n'est plus proposé et ne compte plus dans la progression sur 54. Le résultat des tentatives antérieures à l'historique ne peut pas être déduit : leur nombre va dans `legacyAttempts`, sans événement fabriqué. L'historique détaillé garde au plus les **5 000 réponses les plus récentes** pour éviter de saturer `localStorage`. `historyDropped` compte les événements détaillés écartés ; les cumuls dans `stats` restent conservés.
 
-« Recommencer » vide `roundAnswered`, remet score et série à zéro et efface les marques `mastered`, mais conserve `stats` et `history` pour la révision. Le bouton « Effacer toutes mes données » de l'historique restaure `emptyProgress()` après confirmation. Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a ni compte ni synchronisation entre appareils : deux personnes dans le même profil de navigateur partagent cette sauvegarde.
+« Nouvelle partie » remplace `currentGame` par son état vide : pays trouvés, erreurs, score et série repartent à zéro ; `stats` et `history` sont conservés pour la révision. Le bouton « Effacer toutes mes données » de l'historique restaure `emptyProgress()` après confirmation. Les erreurs de lecture ou d'écriture du stockage n'empêchent pas de jouer ; dans ce cas, la partie courante reste en mémoire seulement. Il n'y a ni compte ni synchronisation entre appareils : deux personnes dans le même profil de navigateur partagent cette sauvegarde.
 
-La fenêtre Historique lit directement `stats[*].wrongAttempts`, qui reste exact même quand les événements les plus anciens ont quitté la liste limitée à 5 000. Elle montre les 54 zones jouables triées par erreurs décroissantes et une ligne « Royaume-Uni (ancien quiz) » si des statistiques `GBR` existaient, puis les 20 réponses les plus récentes. Le mode « À réviser » ne tire que les zones jouables et non encore répondues dans la partie.
+La fenêtre Historique lit directement `stats[*].wrongAttempts`, qui reste exact même quand les événements les plus anciens ont quitté la liste limitée à 5 000. Elle montre les 54 zones jouables triées par erreurs décroissantes et une ligne « Royaume-Uni (ancien quiz) » si des statistiques `GBR` existaient, puis les 20 réponses les plus récentes. Le mode « À réviser » ne tire que les zones non encore trouvées dans la partie.
 
 ## Interface et accessibilité
 
-Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Le nom d'un pays non joué ne figure jamais dans son étiquette accessible. Après une réponse, son étiquette accessible donne son nom et indique qu'il est déjà joué ; `map-tooltip` l'affiche au survol, au focus ou au toucher sans rouvrir le quiz. Les dix points suivent les mêmes règles que les tracés. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages », l'historique et la fenêtre de résultat sont des dialogues modaux natifs, accessibles au clavier. Le temps restant utilise `role="timer"` sans annonce vocale chaque seconde. Le résultat est aussi annoncé par du texte ; les animations sont désactivées avec `prefers-reduced-motion: reduce`.
+Les pays de la carte sont des éléments SVG activables au clic, avec Entrée ou Espace. Le nom d'un pays non trouvé ne figure jamais dans son étiquette accessible. Après une bonne réponse, son étiquette accessible donne son nom et indique qu'il est déjà trouvé ; `map-tooltip` l'affiche au survol, au focus ou au toucher sans rouvrir le quiz. Une zone ratée reste anonyme et sélectionnable. Les dix points suivent les mêmes règles que les tracés. Le quiz est un panneau dans le flux de la page, sous « Mon atlas » sur ordinateur. Il se ferme avec Échap ou son bouton de fermeture. Le menu « Réglages », l'historique et la fenêtre de résultat sont des dialogues modaux natifs, accessibles au clavier. Le temps restant utilise `role="timer"` sans annonce vocale chaque seconde. Le résultat est aussi annoncé par du texte ; les animations sont désactivées avec `prefers-reduced-motion: reduce`.
 
 Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navigateur à 100 % ; le panneau « Mon atlas » mesure moins de la moitié de la carte. Le bouton de tirage au hasard se trouve entre « Mon atlas » et le quiz. Sur mobile, les blocs se superposent et la page peut défiler. Les dix points agrandissent les petites cibles. Le panneau de quiz affiche un aperçu centré sur la zone sélectionnée sur mobile.
 

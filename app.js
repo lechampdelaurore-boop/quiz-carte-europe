@@ -90,8 +90,12 @@
     return Number.isSafeInteger(value) && value >= 0 ? value : 0;
   }
 
+  function emptyGame() {
+    return { foundIds: [], missedIds: [], errors: 0, score: 0, streak: 0 };
+  }
+
   function emptyProgress() {
-    return { schemaVersion: 4, stats: {}, roundAnswered: [], score: 0, streak: 0, history: [], historyDropped: 0 };
+    return { schemaVersion: 5, currentGame: emptyGame(), stats: {}, history: [], historyDropped: 0 };
   }
 
   function loadProgress() {
@@ -99,8 +103,6 @@
       const saved = JSON.parse(localStorage.getItem(storageKey));
       if (saved && typeof saved === 'object' && saved.stats && typeof saved.stats === 'object' && !Array.isArray(saved.stats)) {
         const progress = emptyProgress();
-        progress.score = count(saved.score);
-        progress.streak = count(saved.streak);
         for (const country of [...countries, legacyCountry]) {
           const old = saved.stats[country.id];
           if (!old || typeof old !== 'object') continue;
@@ -112,16 +114,32 @@
             : Math.max(0, attempts - correctAttempts - wrongAttempts);
           progress.stats[country.id] = {
             attempts: Math.max(attempts, correctAttempts + wrongAttempts + legacyAttempts),
-            mastered: old.mastered === true,
             correctAttempts,
             wrongAttempts,
             legacyAttempts,
             lastAttemptAt: typeof old.lastAttemptAt === 'string' ? old.lastAttemptAt : null
           };
         }
-        progress.roundAnswered = Array.isArray(saved.roundAnswered)
-          ? [...new Set(saved.roundAnswered.filter(id => countryById.has(id)))]
-          : countries.filter(country => progress.stats[country.id]?.attempts > 0).map(country => country.id);
+        const oldGame = saved.currentGame;
+        if (oldGame && typeof oldGame === 'object' && !Array.isArray(oldGame)) {
+          progress.currentGame.foundIds = Array.isArray(oldGame.foundIds)
+            ? [...new Set(oldGame.foundIds.filter(id => countryById.has(id)))] : [];
+          progress.currentGame.missedIds = Array.isArray(oldGame.missedIds)
+            ? [...new Set(oldGame.missedIds.filter(id => countryById.has(id)))] : [];
+          progress.currentGame.errors = count(oldGame.errors);
+          progress.currentGame.score = count(oldGame.score);
+          progress.currentGame.streak = count(oldGame.streak);
+        } else {
+          progress.currentGame.foundIds = countries.filter(country => saved.stats[country.id]?.mastered === true)
+            .map(country => country.id);
+          const oldAnswered = Array.isArray(saved.roundAnswered)
+            ? saved.roundAnswered : countries.filter(country => progress.stats[country.id]?.attempts > 0).map(country => country.id);
+          progress.currentGame.missedIds = [...new Set(oldAnswered.filter(id => countryById.has(id)
+            && saved.stats[id]?.mastered !== true))];
+          progress.currentGame.errors = progress.currentGame.missedIds.length;
+          progress.currentGame.score = count(saved.score);
+          progress.currentGame.streak = count(saved.streak);
+        }
         if (Array.isArray(saved.history)) {
           const validHistory = saved.history.filter(item => item && knownCountryId(item.countryId)
             && (knownCountryId(item.chosenId) || (item.chosenId === null && (item.mode === 'open' || item.timedOut === true)))
@@ -139,9 +157,15 @@
   }
 
   let progress = loadProgress();
-  const hasPlayed = id => progress.roundAnswered.includes(id);
+  const hasFound = id => progress.currentGame.foundIds.includes(id);
+  const isGameComplete = () => progress.currentGame.foundIds.length === countries.length;
   function saveProgress() {
     try { localStorage.setItem(storageKey, JSON.stringify(progress)); } catch (_) { /* The game still works without persistence. */ }
+  }
+  function startNewGame() {
+    progress.currentGame = emptyGame();
+    lastRandomId = null;
+    saveProgress();
   }
   updateSettingsInfo();
 
@@ -222,19 +246,22 @@
     timerSecondsInput.value = settings.timerSeconds;
     timerSecondsInput.removeAttribute('aria-invalid');
     timerError.hidden = true;
-    const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0 && !hasPlayed(country.id)).length;
+    const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0 && !hasFound(country.id)).length;
     document.getElementById('settings-note').textContent = difficultCount
-      ? `${difficultCount} pays déjà raté${difficultCount > 1 ? 's' : ''} encore jouable${difficultCount > 1 ? 's' : ''} dans cette partie. Les réglages s'appliquent à la prochaine question.`
-      : 'Chaque pays se joue une seule fois par partie. « À réviser » tire les pays déjà ratés encore disponibles ; sinon, les autres pays à jouer.';
+      ? `${difficultCount} pays déjà raté${difficultCount > 1 ? 's' : ''} à retrouver. Les réglages s'appliquent à la prochaine question.`
+      : 'Un pays reste à jouer jusqu’à sa première bonne réponse. « À réviser » privilégie les pays avec des erreurs enregistrées.';
     updateEmptyHint();
   }
 
   function updateEmptyHint() {
-    document.getElementById('quiz-empty-hint').textContent = progress.roundAnswered.length === countries.length
-      ? 'Tous les pays ont été joués. Clique sur « Recommencer » pour lancer une nouvelle partie.'
+    const complete = isGameComplete();
+    document.querySelector('#quiz-empty h2').textContent = complete ? 'Partie terminée !' : 'À toi de jouer';
+    document.getElementById('new-game-finished').hidden = !complete;
+    document.getElementById('quiz-empty-hint').textContent = complete
+      ? `${countries.length} pays trouvés · ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}. Lance une nouvelle partie pour rejouer.`
       : settings.answerMode === 'open'
-        ? 'Sélectionne un pays encore à jouer sur la carte, puis écris son nom ici.'
-        : 'Sélectionne un pays encore à jouer sur la carte pour afficher les six propositions ici.';
+        ? 'Sélectionne un pays non trouvé sur la carte, puis écris son nom ici.'
+        : 'Sélectionne un pays non trouvé sur la carte pour afficher les six propositions ici.';
   }
 
   function showTimerInputError() {
@@ -333,7 +360,7 @@
   }
 
   function showCountryTooltip(id, clientX, clientY, fromTouch = false) {
-    if (!hasPlayed(id)) return;
+    if (!hasFound(id)) return;
     clearTimeout(tooltipTimer);
     tooltipCountryId = id;
     tooltipFromTouch = fromTouch;
@@ -350,7 +377,7 @@
     node.addEventListener('click', event => {
       if (suppressClick) { suppressClick = false; return; }
       const fromTouch = event.pointerType === 'touch' || Date.now() - lastTouchAt < 700;
-      if (hasPlayed(id)) {
+      if (hasFound(id)) {
         showCountryTooltip(id, event.clientX, event.clientY, fromTouch);
         return;
       }
@@ -446,35 +473,35 @@
   }
 
   function updateUI() {
-    const mastered = countries.filter(country => progress.stats[country.id]?.mastered).length;
-    const remaining = countries.length - progress.roundAnswered.length;
+    const mastered = progress.currentGame.foundIds.length;
+    const remaining = countries.length - mastered;
     document.getElementById('mastered-count').textContent = mastered;
-    document.getElementById('score').textContent = progress.score;
-    document.getElementById('streak').textContent = progress.streak;
+    document.getElementById('score').textContent = progress.currentGame.score;
+    document.getElementById('streak').textContent = progress.currentGame.streak;
     document.getElementById('progress-ring').style.background = `conic-gradient(var(--teal) ${mastered / countries.length * 100}%, #e9ede6 0%)`;
     document.getElementById('progress-fill').style.width = `${mastered / countries.length * 100}%`;
     document.getElementById('progress-track').setAttribute('aria-valuenow', mastered);
     document.getElementById('progress-caption').textContent = remaining === 0
-      ? `Partie terminée : ${mastered} bonne${mastered > 1 ? 's' : ''} réponse${mastered > 1 ? 's' : ''} sur ${countries.length}.`
-      : progress.roundAnswered.length === 0 ? 'Ton voyage commence ici.'
-      : `${remaining} pays encore à jouer.`;
+      ? `Partie terminée : ${mastered} pays trouvés, ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}.`
+      : mastered === 0 && progress.currentGame.errors === 0 ? 'Ton voyage commence ici.'
+      : `${remaining} pays encore à trouver.`;
     document.getElementById('random-button').disabled = remaining === 0;
     updateEmptyHint();
 
     for (const country of countries) {
-      const masteredCountry = !!progress.stats[country.id]?.mastered;
-      const playedCountry = hasPlayed(country.id);
+      const masteredCountry = hasFound(country.id);
+      const missedCountry = !masteredCountry && progress.currentGame.missedIds.includes(country.id);
       for (const node of nodes.get(country.id) || []) {
-        node.setAttribute('aria-label', playedCountry
-          ? `${country.name}, déjà joué dans cette partie.`
+        node.setAttribute('aria-label', masteredCountry
+          ? `${country.name}, déjà trouvé dans cette partie.`
           : `Zone de pays à identifier, numéro ${countries.findIndex(item => item.id === country.id) + 1}`);
-        node.setAttribute('aria-disabled', String(playedCountry));
+        node.setAttribute('aria-disabled', String(masteredCountry));
         node.classList.toggle('mastered', masteredCountry);
-        node.classList.toggle('missed', playedCountry && !masteredCountry);
+        node.classList.toggle('missed', missedCountry);
         node.classList.toggle('selected', country.id === selectedId);
         node.classList.toggle('wrong', country.id === selectedId && answered && feedback.classList.contains('bad'));
         node.classList.toggle('pin-mastered', masteredCountry);
-        node.classList.toggle('pin-missed', playedCountry && !masteredCountry);
+        node.classList.toggle('pin-missed', missedCountry);
         node.classList.toggle('pin-selected', country.id === selectedId);
       }
     }
@@ -532,7 +559,7 @@
   }
 
   function openQuestion(id) {
-    if (!countryById.has(id) || hasPlayed(id)) return;
+    if (!countryById.has(id) || hasFound(id) || isGameComplete()) return;
     hideCountryTooltip();
     previousFocus = document.activeElement;
     selectedId = id;
@@ -577,13 +604,13 @@
   }
 
   function submitAnswer(chosenId, enteredText = null, timedOut = false) {
-    if (answered || !selectedId || hasPlayed(selectedId)) return;
+    if (answered || !selectedId || hasFound(selectedId)) return;
     answered = true;
     stopQuestionTimer();
     const correct = chosenId === selectedId;
     const country = countryById.get(selectedId);
     const stat = progress.stats[selectedId] || {
-      attempts: 0, mastered: false, correctAttempts: 0, wrongAttempts: 0,
+      attempts: 0, correctAttempts: 0, wrongAttempts: 0,
       legacyAttempts: 0, lastAttemptAt: null
     };
     const at = new Date().toISOString();
@@ -591,21 +618,22 @@
     stat.lastAttemptAt = at;
     if (correct) {
       stat.correctAttempts++;
-      if (!stat.mastered) progress.score += 10;
-      stat.mastered = true;
-      progress.streak++;
+      progress.currentGame.foundIds.push(selectedId);
+      progress.currentGame.score += 10;
+      progress.currentGame.streak++;
       feedback.textContent = `Bien joué ! C'est ${country.name}.`;
       feedback.classList.add('good');
     } else {
       stat.wrongAttempts++;
-      progress.streak = 0;
+      progress.currentGame.errors++;
+      progress.currentGame.streak = 0;
+      if (!progress.currentGame.missedIds.includes(selectedId)) progress.currentGame.missedIds.push(selectedId);
       feedback.textContent = timedOut
-        ? `Temps écoulé : c'est ${country.name}. Revois ce pays à la prochaine partie !`
-        : `Pas tout à fait : c'est ${country.name}. Revois ce pays à la prochaine partie !`;
+        ? `Temps écoulé : c'est ${country.name}. Tu peux réessayer !`
+        : `Pas tout à fait : c'est ${country.name}. Tu peux réessayer !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
-    progress.roundAnswered.push(selectedId);
     const event = { countryId: selectedId, chosenId, correct, at, mode: questionMode };
     if (enteredText !== null) event.enteredText = enteredText;
     if (timedOut) event.timedOut = true;
@@ -624,6 +652,8 @@
     freeAnswerSubmit.disabled = true;
     nextButton.hidden = false;
     updateUI();
+    document.getElementById('next-button-label').textContent = isGameComplete() ? 'Voir le bilan' : 'Un autre pays';
+    document.getElementById('result-cta-label').textContent = isGameComplete() ? 'Voir le bilan' : 'Un autre pays';
     resultDialog.dataset.result = correct ? 'good' : 'bad';
     document.getElementById('result-icon').textContent = correct ? '✓' : '×';
     document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
@@ -649,11 +679,11 @@
   function nextQuestion() {
     if (resultDialog.open) resultDialog.close();
     closeQuestion();
-    randomQuestion();
+    if (!isGameComplete()) randomQuestion();
   }
 
   function randomQuestion() {
-    const remaining = countries.filter(country => !hasPlayed(country.id));
+    const remaining = countries.filter(country => !hasFound(country.id));
     if (!remaining.length) { updateUI(); return; }
     const difficult = remaining.filter(country => progress.stats[country.id]?.wrongAttempts > 0);
     const unseen = remaining.filter(country => !progress.stats[country.id]?.attempts);
@@ -802,14 +832,13 @@
     if (!window.confirm('Commencer une nouvelle partie ? Ton score et les pays trouvés seront remis à zéro. Ton historique et tes statistiques d’erreurs seront conservés.')) return;
     if (!question.hidden) closeQuestion();
     hideCountryTooltip();
-    progress.roundAnswered = [];
-    progress.score = 0;
-    progress.streak = 0;
-    for (const country of countries) {
-      if (progress.stats[country.id]) progress.stats[country.id].mastered = false;
-    }
-    lastRandomId = null;
-    saveProgress();
+    startNewGame();
+    updateSettingsInfo();
+    updateUI();
+  });
+  document.getElementById('new-game-finished').addEventListener('click', () => {
+    startNewGame();
+    hideCountryTooltip();
     updateSettingsInfo();
     updateUI();
   });
