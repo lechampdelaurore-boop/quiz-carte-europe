@@ -91,7 +91,7 @@
   }
 
   function emptyProgress() {
-    return { schemaVersion: 3, stats: {}, score: 0, streak: 0, history: [], historyDropped: 0 };
+    return { schemaVersion: 4, stats: {}, roundAnswered: [], score: 0, streak: 0, history: [], historyDropped: 0 };
   }
 
   function loadProgress() {
@@ -119,6 +119,9 @@
             lastAttemptAt: typeof old.lastAttemptAt === 'string' ? old.lastAttemptAt : null
           };
         }
+        progress.roundAnswered = Array.isArray(saved.roundAnswered)
+          ? [...new Set(saved.roundAnswered.filter(id => countryById.has(id)))]
+          : countries.filter(country => progress.stats[country.id]?.attempts > 0).map(country => country.id);
         if (Array.isArray(saved.history)) {
           const validHistory = saved.history.filter(item => item && knownCountryId(item.countryId)
             && (knownCountryId(item.chosenId) || (item.chosenId === null && (item.mode === 'open' || item.timedOut === true)))
@@ -136,6 +139,7 @@
   }
 
   let progress = loadProgress();
+  const hasPlayed = id => progress.roundAnswered.includes(id);
   function saveProgress() {
     try { localStorage.setItem(storageKey, JSON.stringify(progress)); } catch (_) { /* The game still works without persistence. */ }
   }
@@ -218,13 +222,19 @@
     timerSecondsInput.value = settings.timerSeconds;
     timerSecondsInput.removeAttribute('aria-invalid');
     timerError.hidden = true;
-    const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0).length;
+    const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0 && !hasPlayed(country.id)).length;
     document.getElementById('settings-note').textContent = difficultCount
-      ? `${difficultCount} pays avec au moins une erreur enregistrée. Les réglages s'appliquent à la prochaine question ; un clic sur la carte permet toujours de choisir un pays précis.`
-      : 'Aucune erreur enregistrée : « À réviser » proposera les pays à découvrir, puis tous les pays. Les réglages s’appliquent à la prochaine question.';
-    document.getElementById('quiz-empty-hint').textContent = settings.answerMode === 'open'
-      ? 'Sélectionne un pays sur la carte, puis écris son nom ici.'
-      : 'Sélectionne un pays sur la carte pour afficher les six propositions ici.';
+      ? `${difficultCount} pays déjà raté${difficultCount > 1 ? 's' : ''} encore jouable${difficultCount > 1 ? 's' : ''} dans cette partie. Les réglages s'appliquent à la prochaine question.`
+      : 'Chaque pays se joue une seule fois par partie. « À réviser » tire les pays déjà ratés encore disponibles ; sinon, les autres pays à jouer.';
+    updateEmptyHint();
+  }
+
+  function updateEmptyHint() {
+    document.getElementById('quiz-empty-hint').textContent = progress.roundAnswered.length === countries.length
+      ? 'Tous les pays ont été joués. Clique sur « Recommencer » pour lancer une nouvelle partie.'
+      : settings.answerMode === 'open'
+        ? 'Sélectionne un pays encore à jouer sur la carte, puis écris son nom ici.'
+        : 'Sélectionne un pays encore à jouer sur la carte pour afficher les six propositions ici.';
   }
 
   function showTimerInputError() {
@@ -323,7 +333,7 @@
   }
 
   function showCountryTooltip(id, clientX, clientY, fromTouch = false) {
-    if (!progress.stats[id]?.mastered) return;
+    if (!hasPlayed(id)) return;
     clearTimeout(tooltipTimer);
     tooltipCountryId = id;
     tooltipFromTouch = fromTouch;
@@ -340,8 +350,8 @@
     node.addEventListener('click', event => {
       if (suppressClick) { suppressClick = false; return; }
       const fromTouch = event.pointerType === 'touch' || Date.now() - lastTouchAt < 700;
-      if (fromTouch && progress.stats[id]?.mastered && (tooltipCountryId !== id || !tooltipFromTouch)) {
-        showCountryTooltip(id, event.clientX, event.clientY, true);
+      if (hasPlayed(id)) {
+        showCountryTooltip(id, event.clientX, event.clientY, fromTouch);
         return;
       }
       hideCountryTooltip();
@@ -437,27 +447,34 @@
 
   function updateUI() {
     const mastered = countries.filter(country => progress.stats[country.id]?.mastered).length;
+    const remaining = countries.length - progress.roundAnswered.length;
     document.getElementById('mastered-count').textContent = mastered;
     document.getElementById('score').textContent = progress.score;
     document.getElementById('streak').textContent = progress.streak;
     document.getElementById('progress-ring').style.background = `conic-gradient(var(--teal) ${mastered / countries.length * 100}%, #e9ede6 0%)`;
     document.getElementById('progress-fill').style.width = `${mastered / countries.length * 100}%`;
     document.getElementById('progress-track').setAttribute('aria-valuenow', mastered);
-    document.getElementById('progress-caption').textContent = mastered === countries.length
-      ? 'Bravo ! Tu connais toute la carte.'
-      : mastered === 0 ? 'Ton voyage commence ici.'
-      : `${countries.length - mastered} pays encore à découvrir.`;
+    document.getElementById('progress-caption').textContent = remaining === 0
+      ? `Partie terminée : ${mastered} bonne${mastered > 1 ? 's' : ''} réponse${mastered > 1 ? 's' : ''} sur ${countries.length}.`
+      : progress.roundAnswered.length === 0 ? 'Ton voyage commence ici.'
+      : `${remaining} pays encore à jouer.`;
+    document.getElementById('random-button').disabled = remaining === 0;
+    updateEmptyHint();
 
     for (const country of countries) {
       const masteredCountry = !!progress.stats[country.id]?.mastered;
+      const playedCountry = hasPlayed(country.id);
       for (const node of nodes.get(country.id) || []) {
-        node.setAttribute('aria-label', masteredCountry
-          ? `${country.name}, pays découvert. Appuie pour rejouer.`
+        node.setAttribute('aria-label', playedCountry
+          ? `${country.name}, déjà joué dans cette partie.`
           : `Zone de pays à identifier, numéro ${countries.findIndex(item => item.id === country.id) + 1}`);
+        node.setAttribute('aria-disabled', String(playedCountry));
         node.classList.toggle('mastered', masteredCountry);
+        node.classList.toggle('missed', playedCountry && !masteredCountry);
         node.classList.toggle('selected', country.id === selectedId);
         node.classList.toggle('wrong', country.id === selectedId && answered && feedback.classList.contains('bad'));
         node.classList.toggle('pin-mastered', masteredCountry);
+        node.classList.toggle('pin-missed', playedCountry && !masteredCountry);
         node.classList.toggle('pin-selected', country.id === selectedId);
       }
     }
@@ -515,7 +532,7 @@
   }
 
   function openQuestion(id) {
-    if (!countryById.has(id)) return;
+    if (!countryById.has(id) || hasPlayed(id)) return;
     hideCountryTooltip();
     previousFocus = document.activeElement;
     selectedId = id;
@@ -560,7 +577,7 @@
   }
 
   function submitAnswer(chosenId, enteredText = null, timedOut = false) {
-    if (answered || !selectedId) return;
+    if (answered || !selectedId || hasPlayed(selectedId)) return;
     answered = true;
     stopQuestionTimer();
     const correct = chosenId === selectedId;
@@ -583,11 +600,12 @@
       stat.wrongAttempts++;
       progress.streak = 0;
       feedback.textContent = timedOut
-        ? `Temps écoulé : c'est ${country.name}. Réessaie ce pays plus tard !`
-        : `Pas tout à fait : c'est ${country.name}. Réessaie ce pays plus tard !`;
+        ? `Temps écoulé : c'est ${country.name}. Revois ce pays à la prochaine partie !`
+        : `Pas tout à fait : c'est ${country.name}. Revois ce pays à la prochaine partie !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
+    progress.roundAnswered.push(selectedId);
     const event = { countryId: selectedId, chosenId, correct, at, mode: questionMode };
     if (enteredText !== null) event.enteredText = enteredText;
     if (timedOut) event.timedOut = true;
@@ -635,11 +653,12 @@
   }
 
   function randomQuestion() {
-    const remaining = countries.filter(country => !progress.stats[country.id]?.mastered);
-    const difficult = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0);
-    const pool = settings.countrySelection === 'all' ? countries
-      : settings.countrySelection === 'review' && difficult.length ? difficult
-      : remaining.length ? remaining : countries;
+    const remaining = countries.filter(country => !hasPlayed(country.id));
+    if (!remaining.length) { updateUI(); return; }
+    const difficult = remaining.filter(country => progress.stats[country.id]?.wrongAttempts > 0);
+    const unseen = remaining.filter(country => !progress.stats[country.id]?.attempts);
+    const pool = settings.countrySelection === 'review' && difficult.length ? difficult
+      : settings.countrySelection === 'discover' && unseen.length ? unseen : remaining;
     const candidates = pool.length > 1 ? pool.filter(country => country.id !== lastRandomId) : pool;
     let chosen;
     if (settings.countrySelection === 'review' && difficult.length) {
@@ -780,9 +799,27 @@
     if (event.key === 'Escape' && !settingsDialog.open && !historyDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
-    if (!window.confirm('Effacer ton score, les pays déjà trouvés et ton historique de réponses sur cet appareil ?')) return;
+    if (!window.confirm('Commencer une nouvelle partie ? Ton score et les pays trouvés seront remis à zéro. Ton historique et tes statistiques d’erreurs seront conservés.')) return;
+    if (!question.hidden) closeQuestion();
     hideCountryTooltip();
+    progress.roundAnswered = [];
+    progress.score = 0;
+    progress.streak = 0;
+    for (const country of countries) {
+      if (progress.stats[country.id]) progress.stats[country.id].mastered = false;
+    }
+    lastRandomId = null;
+    saveProgress();
+    updateSettingsInfo();
+    updateUI();
+  });
+  document.getElementById('clear-data-button').addEventListener('click', () => {
+    if (!window.confirm('Effacer définitivement le score, l’historique et toutes les statistiques de cet appareil ?')) return;
+    historyDialog.close();
+    if (!question.hidden) closeQuestion();
     progress = emptyProgress();
+    hideCountryTooltip();
+    lastRandomId = null;
     saveProgress();
     updateSettingsInfo();
     updateUI();

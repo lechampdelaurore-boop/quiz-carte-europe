@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f6f5ef">
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-mobile-preview">
+  <link rel="stylesheet" href="styles.css?v=20261011-one-round">
   <script defer src="map-data.js?v=20261011-uk-four"></script>
-  <script defer src="app.js?v=20261011-uk-four"></script>
+  <script defer src="app.js?v=20261011-one-round"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -36,7 +36,7 @@
             <svg id="europe-map" viewBox="0 0 1000 930" role="group" aria-label="Carte interactive des pays d’Europe"></svg>
             <div class="map-tooltip" id="map-tooltip" role="status" aria-live="polite" hidden></div>
           </div>
-          <div class="map-footer"><span><i class="legend-dot unplayed"></i> À découvrir</span><span><i class="legend-dot played"></i> Trouvé</span><span class="map-credit">Contours : Natural Earth</span></div>
+          <div class="map-footer"><span><i class="legend-dot unplayed"></i> À jouer</span><span><i class="legend-dot played"></i> Trouvé</span><span><i class="legend-dot missed"></i> Raté</span><span class="map-credit">Contours : Natural Earth</span></div>
         </div>
 
         <div class="side-column">
@@ -84,9 +84,9 @@
     </fieldset>
     <fieldset>
       <legend>Quels pays tirer au hasard ?</legend>
-      <label class="setting-option"><input type="radio" name="country-selection" value="discover" checked><span><strong>Découverte</strong><small>Pays pas encore trouvés en priorité.</small></span></label>
-      <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les 54 pays et territoires du jeu.</small></span></label>
-      <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays déjà ratés, avec priorité aux plus difficiles.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="discover" checked><span><strong>Découverte</strong><small>Pays jamais joués en priorité.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les pays encore à jouer.</small></span></label>
+      <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays ratés dans les parties précédentes, avec priorité aux plus difficiles.</small></span></label>
     </fieldset>
     <fieldset>
       <legend>Chronomètre</legend>
@@ -101,6 +101,7 @@
     <p class="history-order">Pays classés du plus grand au plus petit nombre d’erreurs.</p>
     <div class="history-table" role="table" aria-label="Erreurs par pays"><div class="history-table-head" role="row"><span role="columnheader">Pays</span><span role="columnheader">Erreurs</span><span role="columnheader">Essais</span></div><div id="history-rows" role="rowgroup"></div></div>
     <details class="recent-history"><summary>Dernières réponses</summary><ol id="recent-history-list"></ol></details>
+    <button class="clear-data-button" id="clear-data-button" type="button">Effacer toutes mes données</button>
   </dialog>
   <dialog class="result-dialog" id="result-dialog" aria-labelledby="result-title" aria-describedby="result-detail">
     <button class="result-advance" id="result-advance" type="button">
