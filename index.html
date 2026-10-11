@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f6f5ef">
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-labels">
+  <link rel="stylesheet" href="styles.css?v=20261011-history-timer">
   <script defer src="map-data.js"></script>
-  <script defer src="app.js?v=20261011-labels"></script>
+  <script defer src="app.js?v=20261011-history-timer"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -45,7 +45,7 @@
             <p class="progress-caption" id="progress-caption">Ton voyage commence ici.</p>
             <div class="stats-grid"><div><span>POINTS</span><strong id="score">0</strong></div><div><span>SÉRIE</span><strong id="streak">0</strong></div></div>
             <div class="progress-track" role="progressbar" aria-label="Pays reconnus" aria-valuemin="0" aria-valuemax="51" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
-            <div class="progress-actions"><span class="save-note">✓ Sauvegardé sur cet appareil</span><button class="reset-button" id="reset-button" type="button">Recommencer</button></div>
+            <div class="progress-actions"><span class="save-note">✓ Sauvegardé sur cet appareil</span><div class="progress-links"><button class="history-button" id="history-button" type="button">Historique</button><button class="reset-button" id="reset-button" type="button">Recommencer</button></div></div>
           </aside>
 
           <button class="primary-button random-button" id="random-button" type="button">Choisir un pays au hasard <span aria-hidden="true">↗</span></button>
@@ -56,6 +56,7 @@
             <div class="quiz-dialog" id="quiz-question" hidden>
               <button class="close-button" id="close-modal" type="button" aria-label="Fermer la question">×</button>
               <span class="section-kicker">03 / DÉFI GÉOGRAPHIE <span id="question-number"></span></span>
+              <div class="quiz-timer" id="quiz-timer" role="timer" aria-label="Temps restant" hidden><span>Temps restant</span><strong id="timer-value">0:30</strong></div>
               <h2 id="quiz-title">Quel est ce pays ?</h2>
               <p id="quiz-hint">Le pays sélectionné est surligné sur la carte.</p>
               <div class="question-preview" aria-label="Aperçu de la zone sélectionnée"><svg id="mini-map" role="img" aria-label="Le pays à identifier est coloré en orange"></svg></div>
@@ -87,7 +88,19 @@
       <label class="setting-option"><input type="radio" name="country-selection" value="all"><span><strong>Tous les pays</strong><small>Tirage uniforme parmi les 51 pays.</small></span></label>
       <label class="setting-option"><input type="radio" name="country-selection" value="review"><span><strong>À réviser</strong><small>Pays déjà ratés, avec priorité aux plus difficiles.</small></span></label>
     </fieldset>
+    <fieldset>
+      <legend>Chronomètre</legend>
+      <label class="setting-option"><input id="timed-mode" type="checkbox"><span><strong>Mode chronométré</strong><small>Un compte à rebours pour chaque question.</small></span></label>
+      <div class="timer-setting" id="timer-setting" hidden><label for="timer-seconds">Durée par question</label><div><input id="timer-seconds" type="number" min="1" max="3600" step="1" inputmode="numeric" value="30" aria-describedby="timer-help timer-error"><span>secondes</span></div><p id="timer-help">De 1 à 3 600 secondes.</p><p class="timer-error" id="timer-error" role="status" hidden></p></div>
+    </fieldset>
     <p class="settings-note" id="settings-note">Les réglages s'appliquent à la prochaine question. Tu peux toujours cliquer directement sur un pays de la carte.</p>
+  </dialog>
+  <dialog class="history-dialog" id="history-dialog" aria-labelledby="history-title">
+    <div class="settings-head"><div><span class="section-kicker">TON PARCOURS</span><h2 id="history-title">Historique</h2></div><button class="settings-close" id="history-close" type="button" aria-label="Fermer l’historique">×</button></div>
+    <p class="history-summary" id="history-summary"></p>
+    <p class="history-order">Pays classés du plus grand au plus petit nombre d’erreurs.</p>
+    <div class="history-table" role="table" aria-label="Erreurs par pays"><div class="history-table-head" role="row"><span role="columnheader">Pays</span><span role="columnheader">Erreurs</span><span role="columnheader">Essais</span></div><div id="history-rows" role="rowgroup"></div></div>
+    <details class="recent-history"><summary>Dernières réponses</summary><ol id="recent-history-list"></ol></details>
   </dialog>
   <dialog class="result-dialog" id="result-dialog" aria-labelledby="result-title" aria-describedby="result-detail">
     <button class="result-advance" id="result-advance" type="button">
