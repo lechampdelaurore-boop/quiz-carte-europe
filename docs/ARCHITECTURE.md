@@ -73,7 +73,7 @@ Sur ordinateur, le bandeau est compact et la page tient dans la hauteur du navig
 
 Le SVG de la carte est positionné dans un conteneur fixe, avec `overflow: visible` pour laisser apparaître les tracés situés hors du repère initial de l'Europe. `renderMap` applique le zoom et le déplacement `panX/panY` ; le niveau initial ajuste la carte à la hauteur disponible et le zoom minimal est 0,85. Le déplacement est borné par `contextExtent` pour ne pas exposer les bords du fond. Le glissement à la souris ou au doigt déplace la carte, et un seuil de cinq pixels distingue ce geste d'un clic sur un pays. La molette, les boutons +/− et le pincement à deux doigts modifient le zoom autour du pointeur ou du centre des doigts.
 
-Sur ordinateur, la case **Zoom automatique sur le pays** est cochée par défaut. `focusCountry` utilise le centre du tracé SVG ou le point d'un petit État, place ce point au centre du conteneur et applique un zoom de 1,55. La préférence est conservée sous la clé `atlas-club-auto-zoom`, séparément du score. Sous 850 px, la case est masquée et le recentrage automatique désactivé : le quiz fournit déjà un aperçu du pays. La préférence enregistrée reste disponible lors du retour sur ordinateur.
+La case **Zoom automatique sur le pays** est cochée par défaut sur ordinateur et mobile. `focusCountry` utilise le centre du tracé SVG ou le point d'un petit État, place ce point au centre du conteneur et applique un zoom de 1,55. La préférence est conservée sous la clé `atlas-club-auto-zoom`, séparément du score. Sous 850 px, le quiz fournit aussi un aperçu de 130 px de haut, avec un cadrage légèrement plus large. `updateMiniMap` ajuste son rapport largeur/hauteur à l'espace réellement disponible une fois le quiz affiché.
 
 ## Déploiement
 
