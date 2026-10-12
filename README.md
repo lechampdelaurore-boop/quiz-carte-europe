@@ -45,6 +45,7 @@ Les polices Google Fonts sont facultatives : des polices locales de remplacement
 | `CLAUDE.md` | Contexte court pour reprendre le travail avec un agent de code |
 | `tests/game-rules.cjs` | Vérification de la migration, des erreurs répétées, de la fin et de la nouvelle partie |
 | `tests/qcm-neighbors.cjs` | Vérification des frontières et des six propositions du QCM |
+| `tests/country-articles.cjs` | Vérification des noms avec article utilisés dans les messages (« la Roumanie », « les Pays-Bas ») |
 
 Pour régénérer `map-data.js` à partir de la révision de Natural Earth épinglée dans le script :
 
@@ -62,7 +63,7 @@ Contours issus de [Natural Earth, Admin 0 Countries](https://www.naturalearthdat
 
 ## Vérification rapide
 
-Lancer `node tests/game-rules.cjs` et `node tests/qcm-neighbors.cjs` pour contrôler la partie, la persistance et les six propositions du QCM.
+Lancer `node tests/game-rules.cjs`, `node tests/qcm-neighbors.cjs` et `node tests/country-articles.cjs` pour contrôler la partie, la persistance, les six propositions du QCM et les noms avec article des messages.
 
 1. Ouvrir le jeu en mode QCM et choisir un pays : six réponses distinctes doivent apparaître, une seule étant correcte. Pour un pays avec frontières terrestres, au moins un distracteur doit être un voisin ; pour Chypre, l'Islande ou Malte, les cinq distracteurs sont aléatoires. Reposer plusieurs fois la question sur la Belgique pour vérifier que le voisin et l'ordre varient.
    Vérifier que l'Angleterre, l'Écosse, le pays de Galles et l'Irlande du Nord sont quatre zones distinctes et que l'Irlande n'est pas confondue avec l'Irlande du Nord.

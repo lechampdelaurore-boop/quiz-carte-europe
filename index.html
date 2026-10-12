@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f6f5ef">
   <meta name="description" content="Un jeu pour apprendre à reconnaître les pays d'Europe sur une carte interactive.">
   <title>Europe à la carte — quiz des pays</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-country-focus">
+  <link rel="stylesheet" href="styles.css?v=20261012-focus-visible">
   <script defer src="map-data.js?v=20261011-small-markers"></script>
-  <script defer src="app.js?v=20261011-desktop-pins"></script>
+  <script defer src="app.js?v=20261012-articles"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -63,7 +63,7 @@
               <div class="answers" id="answers"></div>
               <form class="free-answer" id="free-answer-form" hidden>
                 <label for="free-answer-input">Nom du pays</label>
-                <div class="free-answer-row"><input id="free-answer-input" name="country" type="text" maxlength="80" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Écris le nom du pays" required><button class="primary-button" id="free-answer-submit" type="submit">Valider</button></div>
+                <div class="free-answer-row"><input id="free-answer-input" name="country" type="text" maxlength="80" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Écris le nom du pays" aria-required="true"><button class="primary-button" id="free-answer-submit" type="submit">Valider</button></div>
                 <p>Accents, tirets et petites fautes de frappe sont tolérés.</p>
               </form>
               <p class="feedback" id="feedback" role="status" aria-live="polite"></p>

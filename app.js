@@ -36,6 +36,24 @@
     UKR: ['BLR', 'HUN', 'MDA', 'POL', 'ROU', 'RUS', 'SVK'],
     VAT: ['ITA'], WLS: ['ENG']
   };
+  // Names with their French article, used inside sentences ("c'est la Roumanie").
+  // Keep one entry per playable zone, as for landNeighbors.
+  const countryNamesInSentence = {
+    ALB: "l'Albanie", DEU: "l'Allemagne", AND: "l'Andorre", ENG: "l'Angleterre", ARM: "l'Arménie",
+    AUT: "l'Autriche", AZE: "l'Azerbaïdjan", BEL: 'la Belgique', BLR: 'la Biélorussie',
+    BIH: 'la Bosnie-Herzégovine', BGR: 'la Bulgarie', CYP: 'Chypre', HRV: 'la Croatie',
+    DNK: 'le Danemark', SCT: "l'Écosse", ESP: "l'Espagne", EST: "l'Estonie", FIN: 'la Finlande',
+    FRA: 'la France', GEO: 'la Géorgie', GRC: 'la Grèce', HUN: 'la Hongrie', IRL: "l'Irlande",
+    NIR: "l'Irlande du Nord", ISL: "l'Islande", ITA: "l'Italie", KAZ: 'le Kazakhstan',
+    KOS: 'le Kosovo', LVA: 'la Lettonie', LIE: 'le Liechtenstein', LTU: 'la Lituanie',
+    LUX: 'le Luxembourg', MKD: 'la Macédoine du Nord', MLT: 'Malte', MDA: 'la Moldavie',
+    MCO: 'Monaco', MNE: 'le Monténégro', NOR: 'la Norvège', WLS: 'le pays de Galles',
+    NLD: 'les Pays-Bas', POL: 'la Pologne', PRT: 'le Portugal', ROU: 'la Roumanie',
+    RUS: 'la Russie', SMR: 'Saint-Marin', SRB: 'la Serbie', SVK: 'la Slovaquie',
+    SVN: 'la Slovénie', SWE: 'la Suède', CHE: 'la Suisse', CZE: 'la Tchéquie',
+    TUR: 'la Turquie', UKR: "l'Ukraine", VAT: 'le Vatican'
+  };
+  const nameInSentence = country => countryNamesInSentence[country.id] || country.name;
   const legacyCountry = { id: 'GBR', name: 'Royaume-Uni (ancien quiz)' };
   const knownCountryId = id => countryById.has(id) || id === legacyCountry.id;
   const storageKey = 'atlas-club-europe-v1';
@@ -679,7 +697,7 @@
       progress.currentGame.foundIds.push(selectedId);
       progress.currentGame.score += 10;
       progress.currentGame.streak++;
-      feedback.textContent = `Bien joué ! C'est ${country.name}.`;
+      feedback.textContent = `Bien joué ! C'est ${nameInSentence(country)}.`;
       feedback.classList.add('good');
     } else {
       stat.wrongAttempts++;
@@ -687,8 +705,8 @@
       progress.currentGame.streak = 0;
       if (!progress.currentGame.missedIds.includes(selectedId)) progress.currentGame.missedIds.push(selectedId);
       feedback.textContent = timedOut
-        ? `Temps écoulé : c'est ${country.name}. Tu peux réessayer !`
-        : `Pas tout à fait : c'est ${country.name}. Tu peux réessayer !`;
+        ? `Temps écoulé : c'est ${nameInSentence(country)}. Tu peux réessayer !`
+        : `Pas tout à fait : c'est ${nameInSentence(country)}. Tu peux réessayer !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
@@ -717,8 +735,8 @@
     document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
     document.getElementById('result-title').textContent = correct ? 'Bravo !' : timedOut ? 'Temps écoulé !' : 'À réviser !';
     document.getElementById('result-detail').textContent = correct
-      ? `Tu as reconnu ${country.name}.`
-      : `La bonne réponse était ${country.name}.`;
+      ? `Tu as reconnu ${nameInSentence(country)}.`
+      : `La bonne réponse était ${nameInSentence(country)}.`;
     resultDialog.showModal();
     resultAdvance.focus();
   }

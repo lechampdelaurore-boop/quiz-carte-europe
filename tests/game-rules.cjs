@@ -49,6 +49,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(`
+  ${section('  const countryNamesInSentence = {', '  const legacyCountry =')}
   ${section('  function count(', '  function element(')}
   let selectedId = 'ROU';
   let answered = false;
