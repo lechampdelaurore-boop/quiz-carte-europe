@@ -957,6 +957,7 @@
 
   function closeQuestion() {
     stopQuestionTimer();
+    stopFocusAnimation();
     question.hidden = true;
     emptyQuestion.hidden = false;
     gameLayout.classList.remove('en-question');
@@ -1031,6 +1032,7 @@
   }
 
   function applyZoom(nextZoom, clientX, clientY) {
+    stopFocusAnimation();
     const clamped = Math.max(0.85, Math.min(3.5, nextZoom));
     if (Math.abs(clamped - zoom) < 0.001) return;
     const rect = viewport.getBoundingClientRect();
@@ -1072,14 +1074,14 @@
 
   function focusCountry(id) {
     const { x, y, box, pin } = zoneCenter(id);
-    zoom = level.focusZoom || 1.55;
+    let target = level.focusZoom || 1.55;
     // Sur téléphone, la carte est haute : on zoome davantage sur les petites zones pour qu'elles restent bien visibles
     // (la zone occupe environ 40 % du plus petit côté de la carte, sans dépasser le zoom maximal).
     if (window.matchMedia('(max-width: 850px)').matches && (box || pin)) {
       // Carte large (Asie, continents…) dans un cadre haut : sans ça, même zoomée elle tient entière en hauteur
       // et ne peut pas se recentrer. Le zoom de base part donc d'une carte qui remplit toute la hauteur du cadre.
       const fittedHeight = fittedWidth() * map.height / map.width;
-      zoom *= Math.max(1, viewport.clientHeight / fittedHeight);
+      target *= Math.max(1, viewport.clientHeight / fittedHeight);
       const pixelsPerUnit = fittedWidth() / map.width;
       const size = pin ? { width: 30, height: 30 } : mainBox(id) || box;
       const zoneWidth = Math.max(size.width, 1) * pixelsPerUnit;
@@ -1087,14 +1089,46 @@
       const wanted = 0.4 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
       // Mais une grande zone (continent, Canada, Brésil…) doit rester entière dans le cadre.
       const fits = 0.9 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
-      zoom = Math.max(0.85, Math.min(Math.max(zoom, wanted), Math.max(zoom, 3.5), fits));
+      target = Math.max(0.85, Math.min(Math.max(target, wanted), Math.max(target, 3.5), fits));
     }
+    animateFocus(target, x, y);
+  }
+
+  // Place le point (x, y) de la carte au centre du cadre, au zoom donné.
+  function setView(nextZoom, x, y) {
+    zoom = nextZoom;
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
     panX = width * (0.5 - x / map.width);
     panY = height * (0.5 - y / map.height);
     renderMap();
   }
+
+  // Zoom automatique animé : on part de la vue entière du niveau, puis on plonge vers la zone
+  // en 2,5 s, pour bien voir où elle se trouve. Sans animation (réglage ou prefers-reduced-motion) : saut direct.
+  let focusAnimation = 0;
+  function stopFocusAnimation() {
+    if (focusAnimation) cancelAnimationFrame(focusAnimation);
+    focusAnimation = 0;
+  }
+  function animateFocus(target, x, y) {
+    stopFocusAnimation();
+    if (!motionAllowed()) { setView(target, x, y); return; }
+    const startZoom = 1, startX = map.width / 2, startY = map.height / 2;
+    const duration = 2500;
+    let start = null;
+    setView(startZoom, startX, startY);
+    const step = now => {
+      if (start === null) start = now;
+      const t = Math.min(1, (now - start) / duration);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // D'abord on glisse vers la zone, puis on zoome : le zoom suit une échelle logarithmique.
+      setView(startZoom * Math.pow(target / startZoom, e), startX + (x - startX) * Math.min(1, e * 1.6), startY + (y - startY) * Math.min(1, e * 1.6));
+      focusAnimation = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    focusAnimation = requestAnimationFrame(step);
+  }
+
 
   function zoomFromCenter(factor) {
     const rect = viewport.getBoundingClientRect();
@@ -1403,6 +1437,7 @@
     applyZoom(zoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), event.clientX, event.clientY);
   }, { passive: false });
   viewport.addEventListener('pointerdown', event => {
+    stopFocusAnimation();
     if (event.pointerType === 'touch') lastTouchAt = Date.now();
     if (event.target === viewport || event.target.classList.contains('context-country')) hideCountryTooltip();
     if (event.pointerType === 'touch' || event.button !== 0) return;
@@ -1429,6 +1464,7 @@
     setTimeout(() => { suppressClick = false; }, 0);
   });
   viewport.addEventListener('touchstart', event => {
+    stopFocusAnimation();
     lastTouchAt = Date.now();
     if (event.touches.length === 1) touchPan = { x: event.touches[0].clientX, y: event.touches[0].clientY, panX, panY, moved: false };
     if (event.touches.length === 2) {
