@@ -106,6 +106,7 @@
   const svg = document.getElementById('europe-map');
   const gameLayout = document.querySelector('.game-layout');
   const mapCard = document.querySelector('.map-card');
+  const quizPanel = document.getElementById('quiz-panel');
   const viewport = document.getElementById('map-viewport');
   const mapTooltip = document.getElementById('map-tooltip');
   const question = document.getElementById('quiz-question');
@@ -791,8 +792,10 @@
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
+    question.dataset.ask = questionAsk;
     gameLayout.classList.add('en-question');
     startQuestionTimer();
+    fitMapToQuestion();
     if (autoZoom.checked) focusCountry(id);
     updateUI();
     if (questionMode === 'open') freeAnswerInput.focus();
@@ -945,6 +948,11 @@
     }
     resultDialog.append(layer);
     setTimeout(() => layer.remove(), 3400);
+  }
+
+  // Sur téléphone, la carte prend toute la hauteur laissée par le quiz : carte + réponses tiennent dans l'écran.
+  function fitMapToQuestion() {
+    gameLayout.style.setProperty('--quiz-h', `${quizPanel.offsetHeight}px`);
   }
 
   function closeQuestion() {
@@ -1421,6 +1429,7 @@
 
   async function boot() {
     new ResizeObserver(renderMap).observe(viewport);
+    window.addEventListener('resize', () => { if (!question.hidden) fitMapToQuestion(); });
     let saved = null;
     try { saved = localStorage.getItem(levelKey); } catch (_) { /* Default level. */ }
     const wanted = new URLSearchParams(location.search).get('niveau') || saved || 'europe';

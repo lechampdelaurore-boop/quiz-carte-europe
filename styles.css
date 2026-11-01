@@ -552,7 +552,21 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
   .en-question .quiz-card { order: 1; min-height: 0; }
   .en-question .random-button { order: 2; }
   .en-question .progress-card { order: 3; }
-  .en-question .map-instruction { display: none; }
+  /* Carte + question tiennent dans l'écran : la carte garde toute la hauteur que le quiz laisse libre. */
+  .en-question .map-card { height: max(250px, calc(100dvh - var(--quiz-h, 320px) - 26px)); min-height: 0; }
+  .en-question .map-toolbar { position: absolute; z-index: 3; top: 8px; right: 8px; padding: 0; }
+  .en-question .map-toolbar > div:first-child, .en-question .map-instruction, .en-question .map-footer { display: none; }
+  .en-question .map-viewport { border-top: 0; }
+  .en-question .quiz-card { padding: 10px 12px 12px; }
+  .en-question .auto-zoom { padding-bottom: 6px; margin-bottom: 6px; font-size: .78rem; }
+  .en-question .quiz-dialog h2 { font-size: 1.25rem; margin: 2px 0 8px; padding-right: 40px; }
+  .en-question .quiz-dialog:not([data-ask="code"]) #quiz-hint { display: none; }
+  .en-question .quiz-dialog p#quiz-hint { margin-bottom: 8px; }
+  .en-question .quiz-timer { margin: 4px 0; padding: 3px 12px; }
+  .en-question .close-button { top: -4px; width: 36px; height: 36px; }
+  .en-question .answers { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .en-question .answer { min-height: 46px; padding: 4px 8px; gap: 8px; }
+  .en-question .free-answer p, .en-question .feedback:empty { display: none; }
   .footnote { margin: 4px 4px 18px; }
 }
 @media (max-width: 600px) {
