@@ -1049,8 +1049,17 @@
   }
 
   function focusCountry(id) {
-    const { x, y } = zoneCenter(id);
+    const { x, y, box, pin } = zoneCenter(id);
     zoom = level.focusZoom || 1.55;
+    // Sur téléphone, la carte est haute : on zoome davantage sur les petites zones pour qu'elles restent bien visibles
+    // (la zone occupe environ 40 % du plus petit côté de la carte, sans dépasser le zoom maximal).
+    if (window.matchMedia('(max-width: 850px)').matches && (box || pin)) {
+      const pixelsPerUnit = fittedWidth() / map.width;
+      const zoneWidth = Math.max(pin ? 30 : box.width, 1) * pixelsPerUnit;
+      const zoneHeight = Math.max(pin ? 30 : box.height, 1) * pixelsPerUnit;
+      const wanted = 0.4 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
+      zoom = Math.max(zoom, Math.min(3.5, wanted));
+    }
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
     panX = width * (0.5 - x / map.width);
