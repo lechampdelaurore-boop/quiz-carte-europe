@@ -118,8 +118,11 @@ function topoSimplify(items, tolerance, { minArea = 0 } = {}) {
   const arcs = []; // { owners: [ids], points: projetés simplifiés }
   const result = new Map();
   for (const item of items) {
-    const rings = [];
+    const kept = [];
+    const dropped = [];
     for (const polygon of item.polygons) {
+      const rings = [];
+      let small = false;
       polygon.forEach((rawRing, ringIndex) => {
         const ring = openRing(rawRing);
         if (ring.length < 3) return;
@@ -160,11 +163,20 @@ function topoSimplify(items, tolerance, { minArea = 0 } = {}) {
           out.push(...pts.slice(0, -1));
         }
         if (out.length < 3) return;
-        if (ringIndex === 0 && minArea && ringArea(out) < minArea) return;
+        if (ringIndex === 0 && minArea && ringArea(out) < minArea) small = true;
         rings.push({ points: out, hole: ringIndex > 0 });
       });
+      if (!rings.length || rings[0].hole) continue;
+      (small ? dropped : kept).push(rings);
     }
-    result.set(item.id, rings);
+    // Les petites îles sont retirées, sauf si la zone n'a rien d'autre (micro-États).
+    if (!kept.length && !dropped.length && item.polygons.length) {
+      // Îlots minuscules effacés par la simplification : on garde le plus grand contour brut.
+      const raw = item.polygons.map(p => openRing(p[0]).map(item.project)).reduce((a, b) => ringArea(b) > ringArea(a) ? b : a);
+      if (raw.length >= 3) dropped.push([{ points: raw, hole: false }]);
+    }
+    if (!kept.length && dropped.length) kept.push(dropped.reduce((a, b) => ringArea(b[0].points) > ringArea(a[0].points) ? b : a));
+    result.set(item.id, kept.flat());
   }
   return { rings: result, arcs };
 }
@@ -688,9 +700,235 @@ function buildMondeContinents() {
   });
 }
 
+// ---------- Pays du monde, continent par continent ----------
+
+// [code Natural Earth ADM0_A3, nom, nom dans une phrase, alias éventuels]
+const COUNTRY_NAMES = {
+  afrique: [
+    ['DZA', 'Algérie', "l'Algérie"], ['AGO', 'Angola', "l'Angola"], ['BEN', 'Bénin', 'le Bénin'],
+    ['BWA', 'Botswana', 'le Botswana'], ['BFA', 'Burkina Faso', 'le Burkina Faso'], ['BDI', 'Burundi', 'le Burundi'],
+    ['CMR', 'Cameroun', 'le Cameroun'], ['CPV', 'Cap-Vert', 'le Cap-Vert', ['Cap Vert']],
+    ['CAF', 'République centrafricaine', 'la République centrafricaine', ['Centrafrique']],
+    ['COM', 'Comores', 'les Comores'], ['COG', 'Congo', 'le Congo', ['République du Congo', 'Congo-Brazzaville']],
+    ['COD', 'République démocratique du Congo', 'la République démocratique du Congo', ['RDC', 'Congo-Kinshasa']],
+    ['CIV', "Côte d'Ivoire", "la Côte d'Ivoire"], ['DJI', 'Djibouti', 'Djibouti'], ['EGY', 'Égypte', "l'Égypte"],
+    ['ERI', 'Érythrée', "l'Érythrée"], ['SWZ', 'Eswatini', "l'Eswatini", ['Swaziland']], ['ETH', 'Éthiopie', "l'Éthiopie"],
+    ['GAB', 'Gabon', 'le Gabon'], ['GMB', 'Gambie', 'la Gambie'], ['GHA', 'Ghana', 'le Ghana'], ['GIN', 'Guinée', 'la Guinée'],
+    ['GNB', 'Guinée-Bissau', 'la Guinée-Bissau'], ['GNQ', 'Guinée équatoriale', 'la Guinée équatoriale'],
+    ['KEN', 'Kenya', 'le Kenya'], ['LSO', 'Lesotho', 'le Lesotho'], ['LBR', 'Liberia', 'le Liberia'], ['LBY', 'Libye', 'la Libye'],
+    ['MDG', 'Madagascar', 'Madagascar'], ['MWI', 'Malawi', 'le Malawi'], ['MLI', 'Mali', 'le Mali'], ['MAR', 'Maroc', 'le Maroc'],
+    ['MUS', 'Maurice', 'Maurice', ['Île Maurice']], ['MRT', 'Mauritanie', 'la Mauritanie'], ['MOZ', 'Mozambique', 'le Mozambique'],
+    ['NAM', 'Namibie', 'la Namibie'], ['NER', 'Niger', 'le Niger'], ['NGA', 'Nigeria', 'le Nigeria', ['Nigéria']],
+    ['UGA', 'Ouganda', "l'Ouganda"], ['RWA', 'Rwanda', 'le Rwanda'], ['STP', 'Sao Tomé-et-Principe', 'Sao Tomé-et-Principe'],
+    ['SEN', 'Sénégal', 'le Sénégal'], ['SYC', 'Seychelles', 'les Seychelles'], ['SLE', 'Sierra Leone', 'la Sierra Leone'],
+    ['SOM', 'Somalie', 'la Somalie'], ['SDN', 'Soudan', 'le Soudan'], ['SDS', 'Soudan du Sud', 'le Soudan du Sud'],
+    ['ZAF', 'Afrique du Sud', "l'Afrique du Sud"], ['TZA', 'Tanzanie', 'la Tanzanie'], ['TCD', 'Tchad', 'le Tchad'],
+    ['TGO', 'Togo', 'le Togo'], ['TUN', 'Tunisie', 'la Tunisie'], ['ZMB', 'Zambie', 'la Zambie'], ['ZWE', 'Zimbabwe', 'le Zimbabwe']
+  ],
+  asie: [
+    ['AFG', 'Afghanistan', "l'Afghanistan"], ['SAU', 'Arabie saoudite', "l'Arabie saoudite"], ['ARM', 'Arménie', "l'Arménie"],
+    ['AZE', 'Azerbaïdjan', "l'Azerbaïdjan"], ['BHR', 'Bahreïn', 'Bahreïn'], ['BGD', 'Bangladesh', 'le Bangladesh'],
+    ['BTN', 'Bhoutan', 'le Bhoutan'], ['MMR', 'Birmanie', 'la Birmanie', ['Myanmar']], ['BRN', 'Brunei', 'Brunei'],
+    ['KHM', 'Cambodge', 'le Cambodge'], ['CHN', 'Chine', 'la Chine'], ['CYP', 'Chypre', 'Chypre'],
+    ['PRK', 'Corée du Nord', 'la Corée du Nord'], ['KOR', 'Corée du Sud', 'la Corée du Sud'],
+    ['ARE', 'Émirats arabes unis', 'les Émirats arabes unis', ['Émirats']], ['GEO', 'Géorgie', 'la Géorgie'],
+    ['IND', 'Inde', "l'Inde"], ['IDN', 'Indonésie', "l'Indonésie"], ['IRQ', 'Irak', "l'Irak", ['Iraq']], ['IRN', 'Iran', "l'Iran"],
+    ['ISR', 'Israël', 'Israël'], ['JPN', 'Japon', 'le Japon'], ['JOR', 'Jordanie', 'la Jordanie'], ['KAZ', 'Kazakhstan', 'le Kazakhstan'],
+    ['KGZ', 'Kirghizistan', 'le Kirghizistan'], ['KWT', 'Koweït', 'le Koweït'], ['LAO', 'Laos', 'le Laos'], ['LBN', 'Liban', 'le Liban'],
+    ['MYS', 'Malaisie', 'la Malaisie'], ['MDV', 'Maldives', 'les Maldives'], ['MNG', 'Mongolie', 'la Mongolie'], ['NPL', 'Népal', 'le Népal'],
+    ['OMN', 'Oman', 'Oman'], ['UZB', 'Ouzbékistan', "l'Ouzbékistan"], ['PAK', 'Pakistan', 'le Pakistan'], ['PSX', 'Palestine', 'la Palestine'],
+    ['PHL', 'Philippines', 'les Philippines'], ['QAT', 'Qatar', 'le Qatar'], ['RUS', 'Russie', 'la Russie'], ['SGP', 'Singapour', 'Singapour'],
+    ['LKA', 'Sri Lanka', 'le Sri Lanka'], ['SYR', 'Syrie', 'la Syrie'], ['TJK', 'Tadjikistan', 'le Tadjikistan'], ['TWN', 'Taïwan', 'Taïwan'],
+    ['THA', 'Thaïlande', 'la Thaïlande'], ['TLS', 'Timor oriental', 'le Timor oriental', ['Timor-Leste']], ['TUR', 'Turquie', 'la Turquie'],
+    ['TKM', 'Turkménistan', 'le Turkménistan'], ['VNM', 'Viêt Nam', 'le Viêt Nam', ['Vietnam']], ['YEM', 'Yémen', 'le Yémen']
+  ],
+  'amerique-nord': [
+    ['ATG', 'Antigua-et-Barbuda', 'Antigua-et-Barbuda'], ['BHS', 'Bahamas', 'les Bahamas'], ['BRB', 'Barbade', 'la Barbade'],
+    ['BLZ', 'Belize', 'le Belize'], ['CAN', 'Canada', 'le Canada'], ['CRI', 'Costa Rica', 'le Costa Rica'], ['CUB', 'Cuba', 'Cuba'],
+    ['DMA', 'Dominique', 'la Dominique'], ['SLV', 'Salvador', 'le Salvador'], ['USA', 'États-Unis', 'les États-Unis', ['USA']],
+    ['GRD', 'Grenade', 'la Grenade'], ['GRL', 'Groenland', 'le Groenland'], ['GTM', 'Guatemala', 'le Guatemala'], ['HTI', 'Haïti', 'Haïti'],
+    ['HND', 'Honduras', 'le Honduras'], ['JAM', 'Jamaïque', 'la Jamaïque'], ['MEX', 'Mexique', 'le Mexique'], ['NIC', 'Nicaragua', 'le Nicaragua'],
+    ['PAN', 'Panama', 'le Panama'], ['DOM', 'République dominicaine', 'la République dominicaine'],
+    ['KNA', 'Saint-Christophe-et-Niévès', 'Saint-Christophe-et-Niévès', ['Saint-Kitts-et-Nevis']], ['LCA', 'Sainte-Lucie', 'Sainte-Lucie'],
+    ['VCT', 'Saint-Vincent-et-les-Grenadines', 'Saint-Vincent-et-les-Grenadines'], ['TTO', 'Trinité-et-Tobago', 'Trinité-et-Tobago'],
+    ['GLP', 'Guadeloupe', 'la Guadeloupe'], ['MTQ', 'Martinique', 'la Martinique']
+  ],
+  'amerique-sud': [
+    ['ARG', 'Argentine', "l'Argentine"], ['BOL', 'Bolivie', 'la Bolivie'], ['BRA', 'Brésil', 'le Brésil'], ['CHL', 'Chili', 'le Chili'],
+    ['COL', 'Colombie', 'la Colombie'], ['ECU', 'Équateur', "l'Équateur"], ['GUY', 'Guyana', 'le Guyana'], ['PRY', 'Paraguay', 'le Paraguay'],
+    ['PER', 'Pérou', 'le Pérou'], ['SUR', 'Suriname', 'le Suriname'], ['URY', 'Uruguay', "l'Uruguay"], ['VEN', 'Venezuela', 'le Venezuela', ['Vénézuela']],
+    ['GUF', 'Guyane', 'la Guyane', ['Guyane française']]
+  ],
+  oceanie: [
+    ['AUS', 'Australie', "l'Australie"], ['FJI', 'Fidji', 'les Fidji'], ['KIR', 'Kiribati', 'les Kiribati'],
+    ['MHL', 'Îles Marshall', 'les Îles Marshall', ['Marshall']], ['FSM', 'Micronésie', 'la Micronésie', ['États fédérés de Micronésie']],
+    ['NRU', 'Nauru', 'Nauru'], ['NZL', 'Nouvelle-Zélande', 'la Nouvelle-Zélande'], ['PLW', 'Palaos', 'les Palaos', ['Palau']],
+    ['PNG', 'Papouasie-Nouvelle-Guinée', 'la Papouasie-Nouvelle-Guinée'], ['SLB', 'Îles Salomon', 'les Îles Salomon', ['Salomon']],
+    ['WSM', 'Samoa', 'les Samoa'], ['TON', 'Tonga', 'les Tonga'], ['TUV', 'Tuvalu', 'les Tuvalu'], ['VUT', 'Vanuatu', 'le Vanuatu'],
+    ['NCL', 'Nouvelle-Calédonie', 'la Nouvelle-Calédonie'], ['PYF', 'Polynésie française', 'la Polynésie française', ['Polynésie']],
+    ['WLF', 'Wallis-et-Futuna', 'Wallis-et-Futuna']
+  ]
+};
+// Territoires rattachés à une zone jouable (pas de frontière intérieure dessinée).
+const MERGED_INTO = { SOL: 'SOM', HKG: 'CHN', MAC: 'CHN', CYN: 'CYP' };
+// Zones tirées de quelques polygones d'un pays (outre-mer français) : [code source, emprise].
+const PARTS = {
+  GLP: ['FRA', { west: -62, east: -60.9, south: 15.8, north: 16.6 }],
+  MTQ: ['FRA', { west: -61.3, east: -60.7, south: 14.3, north: 14.95 }],
+  GUF: ['FRA', { west: -55, east: -51, south: 1.9, north: 6 }]
+};
+const WORLD_LEVELS = {
+  afrique: { title: "Les pays d'Afrique", extent: { lon0: 18, west: -26, east: 60, south: -36, north: 38 } },
+  'amerique-nord': {
+    title: "Les pays d'Amérique du Nord", extent: { lon0: -90, west: -170, east: -12, south: 6, north: 84 },
+    // Encadré agrandi des Petites Antilles, placé dans l'Atlantique.
+    inset: { id: 'antilles', title: 'Petites Antilles', box: { x: 700, y: 230, w: 180, h: 230 }, extent: { west: -63.4, east: -59.3, south: 9.9, north: 18.3 },
+      codes: ['ATG', 'BRB', 'DMA', 'GRD', 'KNA', 'LCA', 'VCT', 'TTO', 'GLP', 'MTQ'] }
+  },
+  'amerique-sud': { title: "Les pays d'Amérique du Sud", extent: { lon0: -60, west: -92, east: -32, south: -56, north: 13 } },
+  asie: { title: "Les pays d'Asie", extent: { lon0: 95, west: 25, east: 180, south: -11, north: 80 } },
+  oceanie: { title: "Les pays d'Océanie", extent: { lon0: 165, west: 110, east: -128, south: -48, north: 22 } }
+};
+
+// Fusionne des polygones voisins (les arêtes communes s'annulent) et renvoie les anneaux extérieurs restants.
+function dissolve(polygons) {
+  const signed = ring => {
+    let a = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
+    return a / 2;
+  };
+  const edges = new Map();
+  for (const polygon of polygons) polygon.forEach((raw, index) => {
+    let ring = openRing(raw);
+    const ccw = signed(ring) > 0;
+    if ((index === 0) !== ccw) ring = ring.slice().reverse();
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      const back = keyOf(b) + '>' + keyOf(a);
+      if (edges.has(back)) edges.delete(back);
+      else edges.set(keyOf(a) + '>' + keyOf(b), [a, b]);
+    }
+  });
+  const from = new Map();
+  for (const [a, b] of edges.values()) {
+    const k = keyOf(a);
+    if (!from.has(k)) from.set(k, []);
+    from.get(k).push(b);
+  }
+  const rings = [];
+  for (const [startKey, list] of from) {
+    while (list.length) {
+      const ring = [];
+      let key = startKey;
+      let point = null;
+      do {
+        const next = from.get(key);
+        if (!next || !next.length) break;
+        point = next.pop();
+        ring.push(point);
+        key = keyOf(point);
+      } while (key !== startKey);
+      if (ring.length >= 3) rings.push(ring);
+    }
+  }
+  const outers = rings.filter(r => signed(r) > 0);
+  const holes = rings.filter(r => signed(r) <= 0);
+  return outers.map(outer => [outer, ...holes.filter(h => pointInRing(h[0], outer))]);
+}
+
+const withinExtent = (ring, e) => ring.some(([x, y]) => x >= e.west && x <= e.east && y >= e.south && y <= e.north);
+
+function buildWorldCountries(continent) {
+  const level = WORLD_LEVELS[continent];
+  const names = COUNTRY_NAMES[continent];
+  const project = equalEarthFit(level.extent, { x: 8, y: 8, w: 984, h: Infinity });
+  const features = source('countries50').features;
+  const byCode = new Map(features.map(f => [f.properties.ADM0_A3, f]));
+  const playable = new Set(names.map(n => n[0]));
+  const items = names.map(([code, name, inSentence, aliases]) => {
+    let polygons;
+    if (PARTS[code]) {
+      const [sourceCode, e] = PARTS[code];
+      polygons = polygonsOf(byCode.get(sourceCode).geometry).filter(p => p[0].every(([x, y]) => x >= e.west && x <= e.east && y >= e.south && y <= e.north));
+    } else {
+      if (!byCode.has(code)) throw new Error('Pays absent de Natural Earth : ' + code);
+      polygons = polygonsOf(byCode.get(code).geometry);
+      const merged = Object.entries(MERGED_INTO).filter(([, target]) => target === code).map(([from]) => byCode.get(from));
+      if (merged.length) polygons = dissolve([...polygons, ...merged.flatMap(f => polygonsOf(f.geometry))]);
+    }
+    if (!polygons.length) throw new Error('Aucun contour pour ' + code);
+    return { id: code, name, inSentence, aliases, polygons };
+  });
+  // Pays de la même région affichés en fond, pour que la carte ne flotte pas dans le vide.
+  const used = new Set([...playable, ...Object.keys(MERGED_INTO).filter(k => playable.has(MERGED_INTO[k]))]);
+  const relWest = wrapLon(level.extent.west, level.extent.lon0);
+  let relEast = wrapLon(level.extent.east, level.extent.lon0);
+  if (relEast <= relWest) relEast += 360;
+  const extentRel = { west: relWest - 30, east: relEast + 30, south: level.extent.south - 15, north: Math.min(90, level.extent.north + 10) };
+  const context = [];
+  const inPart = (code, polygon) => Object.entries(PARTS).some(([k, [src, e]]) => src === code && playable.has(k) &&
+    polygon[0].every(([x, y]) => x >= e.west && x <= e.east && y >= e.south && y <= e.north));
+  for (const f of features) {
+    const code = f.properties.ADM0_A3;
+    if (used.has(code)) continue;
+    const parts = [];
+    for (const polygon of polygonsOf(f.geometry)) {
+      if (inPart(code, polygon)) continue;
+      const ring = project.ring(polygon[0]);
+      const lons = ring.map(p => p[0]);
+      const lats = ring.map(p => p[1]);
+      if (Math.max(...lons) < extentRel.west || Math.min(...lons) > extentRel.east || Math.max(...lats) < extentRel.south || Math.min(...lats) > extentRel.north) continue;
+      const pts = douglasPeucker(ring.map(project), 1);
+      if (pts.length >= 3 && ringArea(pts) > 1) parts.push({ points: pts });
+    }
+    if (parts.length) context.push(pathOf(parts));
+  }
+  const rel = relativeItems(items, project);
+  const { rings } = topoSimplify(rel, 0.5, { minArea: 0.5 });
+  let insetRings = new Map();
+  const insets = [];
+  if (level.inset) {
+    const { id, title, box, extent, codes } = level.inset;
+    const inner = { x: box.x + 6, y: box.y + 18, w: box.w - 12, h: box.h - 24 };
+    const insetProject = mercatorFit(extent, inner);
+    insetRings = topoSimplify(items.filter(i => codes.includes(i.id)).map(i => ({ ...i, project: insetProject })), 0.4).rings;
+    insets.push({ id, title, ...box });
+  }
+  const pins = [];
+  const zones = items.map(item => {
+    const r = rings.get(item.id);
+    const p = interiorPoint(r);
+    if (!p) throw new Error('Contour vide après simplification : ' + item.id + ' (' + item.polygons.length + ' polygones)');
+    const box = bboxOf(r);
+    const zone = { id: item.id, name: item.name, inSentence: item.inSentence, type: 'area', d: pathOf(r), labelX: p.x, labelY: p.y };
+    if (item.aliases) zone.aliases = item.aliases;
+    if (insetRings.has(item.id)) {
+      const ir = insetRings.get(item.id);
+      const ip = interiorPoint(ir);
+      Object.assign(zone, { dInset: pathOf(ir), insetLabelX: ip.x, insetLabelY: ip.y });
+    }
+    // Repère visible pour les pays trop petits pour être touchés au doigt.
+    const area = r.filter(x => !x.hole).reduce((sum, x) => sum + ringArea(x.points), 0);
+    if (Math.max(box.maxX - box.minX, box.maxY - box.minY) < 10 || area < 30) pins.push({ id: item.id, x: p.x, y: p.y, visible: true });
+    return zone;
+  }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  writeLevel({
+    id: 'monde-' + continent, title: level.title, width: 1000, height: project.height,
+    contextExtent: { left: 0, top: 0, right: 1000, bottom: project.height },
+    zones, context, lines: [], overlay: [], pins, neighbors: neighborsOf(items),
+    insets, attribution: ATTRIBUTION.ne, projection: 'Equal Earth'
+  });
+}
+
 // ---------- Index ----------
 
 const LEVELS = {
+  'monde-afrique': { title: "Les pays d'Afrique", group: 'Monde', build: () => buildWorldCountries('afrique') },
+  'monde-amerique-nord': { title: "Les pays d'Amérique du Nord", group: 'Monde', build: () => buildWorldCountries('amerique-nord') },
+  'monde-amerique-sud': { title: "Les pays d'Amérique du Sud", group: 'Monde', build: () => buildWorldCountries('amerique-sud') },
+  'monde-asie': { title: "Les pays d'Asie", group: 'Monde', build: () => buildWorldCountries('asie') },
+  'monde-oceanie': { title: "Les pays d'Océanie", group: 'Monde', build: () => buildWorldCountries('oceanie') },
   'monde-continents': { title: 'Les continents', group: 'Monde', build: buildMondeContinents },
   'france-fleuves': { title: 'Les fleuves et rivières', group: 'France', build: buildFranceFleuves },
   'france-regions': { title: 'Les régions', group: 'France', build: buildFranceRegions },

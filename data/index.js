@@ -1,6 +1,12 @@
 // Généré par scripts/generate-levels.mjs, ne pas modifier à la main.
 window.GEO_LEVEL_LIST = [
   {
+    "id": "monde-afrique",
+    "title": "Les pays d'Afrique",
+    "group": "Monde",
+    "file": "data/monde-afrique.js"
+  },
+  {
     "id": "monde-continents",
     "title": "Les continents",
     "group": "Monde",
