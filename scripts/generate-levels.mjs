@@ -14,7 +14,9 @@ const FR = 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/5d34e
 const SOURCES = {
   countries10: NE + 'ne_10m_admin_0_countries.geojson',
   departements: FR + 'departements-avec-outre-mer.geojson',
-  regions: FR + 'regions-avec-outre-mer.geojson'
+  regions: FR + 'regions-avec-outre-mer.geojson',
+  rivers: NE + 'ne_10m_rivers_lake_centerlines.geojson',
+  riversEurope: NE + 'ne_10m_rivers_europe.geojson'
 };
 const ATTRIBUTION = {
   ne: 'Natural Earth (domaine public), naturalearthdata.com',
@@ -428,9 +430,106 @@ function buildFranceRegions() {
   });
 }
 
+// Noms tels qu'écrits dans Natural Earth (name ou name_fr), plusieurs graphies possibles.
+const RIVERS = [
+  { id: 'seine', name: 'Seine', inSentence: 'la Seine', kind: 'fleuve', ne: ['Seine'] },
+  { id: 'loire', name: 'Loire', inSentence: 'la Loire', kind: 'fleuve', ne: ['Loire'] },
+  { id: 'garonne', name: 'Garonne', inSentence: 'la Garonne', kind: 'fleuve', ne: ['Garonne'] },
+  { id: 'rhone', name: 'Rhône', inSentence: 'le Rhône', kind: 'fleuve', ne: ['Rhône', 'Rhne'] },
+  { id: 'rhin', name: 'Rhin', inSentence: 'le Rhin', kind: 'fleuve', ne: ['Rhin', 'Rhein', 'Rhine'] },
+  { id: 'dordogne', name: 'Dordogne', inSentence: 'la Dordogne', kind: 'fleuve', ne: ['Dordogne'] },
+  { id: 'meuse', name: 'Meuse', inSentence: 'la Meuse', kind: 'fleuve', ne: ['Maas', 'Meuse'] },
+  { id: 'escaut', name: 'Escaut', inSentence: "l'Escaut", kind: 'fleuve', ne: ['Schelde', 'Escaut'] },
+  { id: 'somme', name: 'Somme', inSentence: 'la Somme', kind: 'fleuve', ne: ['Somme'] },
+  { id: 'charente', name: 'Charente', inSentence: 'la Charente', kind: 'fleuve', ne: ['Charente'] },
+  { id: 'adour', name: 'Adour', inSentence: "l'Adour", kind: 'fleuve', ne: ['Adour'] },
+  { id: 'vilaine', name: 'Vilaine', inSentence: 'la Vilaine', kind: 'fleuve', ne: ['Vilaine'] },
+  { id: 'saone', name: 'Saône', inSentence: 'la Saône', kind: 'riviere', ne: ['Saône', 'Sane'] },
+  { id: 'moselle', name: 'Moselle', inSentence: 'la Moselle', kind: 'riviere', ne: ['Mosel', 'Moselle'] },
+  { id: 'marne', name: 'Marne', inSentence: 'la Marne', kind: 'riviere', ne: ['Marne'] },
+  { id: 'allier', name: 'Allier', inSentence: "l'Allier", kind: 'riviere', ne: ['Allier'] },
+  { id: 'lot', name: 'Lot', inSentence: 'le Lot', kind: 'riviere', ne: ['Lot'] },
+  { id: 'tarn', name: 'Tarn', inSentence: 'le Tarn', kind: 'riviere', ne: ['Tarn'] },
+  { id: 'durance', name: 'Durance', inSentence: 'la Durance', kind: 'riviere', ne: ['Durance'] },
+  { id: 'vienne', name: 'Vienne', inSentence: 'la Vienne', kind: 'riviere', ne: ['Vienne'] }
+];
+const RIVER_AREA = { west: -6, east: 12, south: 41, north: 53 };
+const FLEUVES_BOX = { x: 10, y: 10, w: 980, h: 960 };
+
+function buildFranceFleuves() {
+  const metro = mercatorFit(METRO_EXTENT, FLEUVES_BOX);
+  const lineStrings = geometry => geometry.type === 'LineString' ? [geometry.coordinates] : geometry.type === 'MultiLineString' ? geometry.coordinates : [];
+  const inArea = line => line.some(([x, y]) => x > RIVER_AREA.west && x < RIVER_AREA.east && y > RIVER_AREA.south && y < RIVER_AREA.north);
+  const features = [...source('rivers').features, ...source('riversEurope').features].filter(f => f.geometry);
+  // Décor : contour de la France métropolitaine et limites des régions.
+  const regionItems = source('regions').features.filter(f => f.properties.code.length === 2 && +f.properties.code > 10)
+    .map(f => ({ id: f.properties.code, polygons: polygonsOf(f.geometry), project: metro }));
+  const { arcs, rings: regionRings } = topoSimplify(regionItems, 0.8);
+  const franceRings = [...regionRings.values()].flat().filter(r => !r.hole).map(r => r.points);
+  const inFrance = ([x, y]) => franceRings.some(pts => {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i];
+      const [xj, yj] = pts[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  });
+  const rawLines = [];
+  const zones = RIVERS.map(river => {
+    const lines = [];
+    for (const f of features) {
+      const names = [f.properties.name, f.properties.name_fr, f.properties.name_en];
+      if (!names.some(n => river.ne.includes(n))) continue;
+      for (const line of lineStrings(f.geometry)) if (inArea(line)) lines.push(line);
+    }
+    if (!lines.length) throw new Error('Cours d\'eau introuvable : ' + river.name);
+    rawLines.push({ id: river.id, lines: lines.map(line => line.map(metro)) });
+    const projected = lines.map(line => douglasPeucker(line.map(metro), 0.6)).filter(l => l.length > 1);
+    // Point d'étiquette : milieu (en longueur) du plus long tronçon situé en France.
+    const length = l => l.reduce((sum, p, i) => i ? sum + Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0, 0);
+    const runs = [];
+    for (const l of projected) {
+      let run = [];
+      for (const p of l) { if (inFrance(p)) run.push(p); else { if (run.length > 1) runs.push(run); run = []; } }
+      if (run.length > 1) runs.push(run);
+    }
+    const longest = (runs.length ? runs : projected).reduce((a, b) => length(b) > length(a) ? b : a);
+    let half = length(longest) / 2;
+    let label = longest[0];
+    for (let i = 1; i < longest.length; i++) {
+      const step = Math.hypot(longest[i][0] - longest[i - 1][0], longest[i][1] - longest[i - 1][1]);
+      if (step >= half) { const t = half / step; label = [longest[i - 1][0] + t * (longest[i][0] - longest[i - 1][0]), longest[i - 1][1] + t * (longest[i][1] - longest[i - 1][1])]; break; }
+      half -= step;
+    }
+    return { id: river.id, name: river.name, inSentence: river.inSentence, type: 'line', kind: river.kind, d: projected.map(linePath).join(''), labelX: +label[0].toFixed(1), labelY: +label[1].toFixed(1) };
+  });
+  // Voisins : cours d'eau qui se rejoignent (extrémité d'un tronçon à moins de 3 unités de l'autre cours d'eau).
+  const neighbors = Object.fromEntries(RIVERS.map(r => [r.id, new Set()]));
+  for (const a of rawLines) for (const b of rawLines) {
+    if (a.id === b.id) continue;
+    for (const line of a.lines) for (const end of [line[0], line[line.length - 1]]) {
+      if (b.lines.some(other => other.some(p => Math.hypot(p[0] - end[0], p[1] - end[1]) < 3))) { neighbors[a.id].add(b.id); neighbors[b.id].add(a.id); }
+    }
+  }
+  const coast = arcs.filter(a => a.owners.length === 1).map(a => linePath(a.points)).join('');
+  const borders = arcs.filter(a => a.owners.length === 2).map(a => linePath(a.points)).join('');
+  const [l, t] = metro([FR_CONTEXT.west, FR_CONTEXT.north]);
+  const [r, b] = metro([FR_CONTEXT.east, FR_CONTEXT.south]);
+  const height = 980;
+  writeLevel({
+    id: 'france-fleuves', title: 'Les fleuves et rivières', width: 1000, height,
+    contextExtent: { left: +l.toFixed(1), top: +t.toFixed(1), right: +r.toFixed(1), bottom: +b.toFixed(1) },
+    zones, context: contextPaths(metro, FR_CONTEXT, 2), lines: [coast, borders], overlay: [], pins: [],
+    neighbors: Object.fromEntries(Object.entries(neighbors).map(([k, v]) => [k, [...v].sort()])),
+    insets: [], attribution: [ATTRIBUTION.ne, ATTRIBUTION.fr].join(' ; ')
+  });
+}
+
 // ---------- Index ----------
 
 const LEVELS = {
+  'france-fleuves': { title: 'Les fleuves et rivières', group: 'France', build: buildFranceFleuves },
   'france-regions': { title: 'Les régions', group: 'France', build: buildFranceRegions },
   'france-departements': { title: 'Les départements', group: 'France', build: buildFranceDepartements }
 };
