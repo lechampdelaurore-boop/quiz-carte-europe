@@ -4,9 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f5ef">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="appli-marc" content="oui">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Géographie">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="description" content="Un jeu pour apprendre la géographie sur une carte interactive : pays, régions, départements, fleuves et continents.">
   <title>Géographie à la carte</title>
-  <link rel="stylesheet" href="styles.css?v=20261101-niveaux">
+  <link rel="stylesheet" href="styles.css?v=20261101-niveaux-accueil">
   <script defer src="data/index.js"></script>
   <script defer src="app.js?v=20261101-niveaux"></script>
 </head>
@@ -23,7 +30,10 @@
           </button>
           <div class="level-menu" id="level-menu" aria-label="Choisir un niveau" hidden></div>
         </div>
-        <button class="settings-toggle" id="settings-button" type="button" aria-label="Ouvrir les réglages"><span aria-hidden="true">⚙</span><span class="settings-label">Réglages</span></button>
+        <div class="intro-actions">
+          <a class="settings-toggle home-link" href="/" aria-label="Mes applis"><span aria-hidden="true">🏠</span><span class="settings-label">Mes applis</span></a>
+          <button class="settings-toggle" id="settings-button" type="button" aria-label="Ouvrir les réglages"><span aria-hidden="true">⚙</span><span class="settings-label">Réglages</span></button>
+        </div>
       </section>
 
       <section class="game-layout" aria-label="Jeu de géographie">
@@ -122,5 +132,10 @@
       <span class="result-cta"><span id="result-cta-label">Suivant</span><span aria-hidden="true">↗</span></span>
     </button>
   </dialog>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    }
+  </script>
 </body>
 </html>
