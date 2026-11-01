@@ -27,6 +27,10 @@ La carte se déplace en la faisant glisser et se zoome avec la molette, un pince
 
 Une bonne réponse rapporte **10 points** dans la partie en cours. Après chaque réponse, une fenêtre animée verte ou rouge indique clairement le résultat et le bon pays. Cliquer ou toucher cette fenêtre lance une autre question disponible ; le bouton **Un autre pays** reste utilisable si la fenêtre est fermée avec Échap. Le compteur de série augmente après chaque bonne réponse et revient à zéro après une erreur. La progression de la partie est enregistrée dans le `localStorage` du navigateur : recharger la page conserve les pays trouvés et les erreurs. Quand les 54 zones ont été correctement trouvées, la partie se termine automatiquement avec un bilan des pays trouvés et des erreurs ; aucun autre quiz ne s'ouvre. **Nouvelle partie** remet à zéro les pays trouvés, les erreurs, le score et la série de la partie, tout en conservant l'historique daté et les compteurs cumulés de réussites et d'erreurs par pays. Le bouton **Historique** dans **Mon atlas** affiche les 54 zones jouables classées par nombre d'erreurs, avec le nombre d'essais ; les dernières réponses sont consultables en bas de cette fenêtre. Les anciennes statistiques du « Royaume-Uni » restent visibles comme ligne d'archive si elles existent, sans donner automatiquement la maîtrise des quatre nouveaux territoires. Le mode « À réviser » utilise les compteurs des zones jouables. Ces données restent propres à ce profil de navigateur et à cet appareil : il n'y a pas de compte ni de synchronisation. **Effacer toutes mes données**, dans l'historique, supprime la progression et les statistiques après confirmation, sans modifier les réglages.
 
+### Installer sur un téléphone
+
+Le jeu s'installe comme une appli (Chrome sur Android : menu ⋮ puis « Installer l'application » ; Safari sur iPhone : Partager puis « Sur l'écran d'accueil ») et fonctionne ensuite hors ligne. Le bouton **🏠 Mes applis** ramène à la page d'accueil de toutes les applis : https://lechampdelaurore-boop.github.io/ (la balise `<meta name="appli-marc">` y fait apparaître le jeu).
+
 ## Lancer en local
 
 Le jeu est statique et ne nécessite ni installation ni compilation. Pour le servir avec Node.js 18 ou plus :
@@ -47,6 +51,7 @@ Les polices Google Fonts sont facultatives : des polices locales de remplacement
 | `styles.css` | Styles ordinateur et mobile |
 | `app.js` | Carte interactive, questions, score et sauvegarde |
 | `map-data.js` | Tracés et noms des pays, générés à partir de Natural Earth |
+| `manifest.webmanifest`, `sw.js`, `icons/` | Installation sur l'écran d'accueil d'un téléphone et jeu hors ligne (tous les niveaux). Après une modification des fichiers du jeu ou un nouveau fichier de `data/`, changer la valeur de `CACHE` dans `sw.js` et compléter sa liste `FILES` |
 | `scripts/generate-map.mjs` | Régénération des tracés à partir d'une révision épinglée |
 | `scripts/serve.mjs` | Petit serveur local sans dépendance |
 | `docs/ARCHITECTURE.md` | Règles techniques et points d'attention |
