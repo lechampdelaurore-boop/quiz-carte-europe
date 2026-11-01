@@ -2,6 +2,14 @@
 
 Jeu de géographie en français pour reconnaître **54 zones d'Europe** sur une carte interactive. Le Royaume-Uni est partagé en Angleterre, Écosse, pays de Galles et Irlande du Nord ; l'Irlande reste une réponse distincte. On peut répondre en choisissant parmi six noms ou en écrivant le nom du pays ou territoire. Le jeu fonctionne dans un navigateur sur ordinateur et sur mobile.
 
+## Niveaux
+
+Le menu en haut à gauche choisit le niveau : **France** (régions, départements, fleuves et rivières), **Europe** (les 54 zones décrites ci-dessous) et **Monde** (continents, puis pays continent par continent). Un niveau dont les données ne sont pas encore prêtes est marqué « bientôt ». Chaque niveau a sa propre partie, ses statistiques et son historique ; les réglages sont communs. Le dernier niveau joué est rouvert au chargement, et `?niveau=<id>` dans l'adresse ouvre directement un niveau (`europe`, `france-regions`, `france-departements`…).
+
+Sur les départements, les numéros sont affichés sur la carte quand elle est assez grande. Le réglage **Que dois-tu trouver ?** choisit entre le nom (les numéros aident) et le numéro (le nom est donné ; seuls les numéros déjà trouvés restent affichés). Paris et la petite couronne se touchent aussi dans leur encadré agrandi, et les départements d'outre-mer sont dans leurs encadrés.
+
+Le détail ci-dessous décrit le niveau Europe ; les autres niveaux suivent les mêmes règles.
+
 ## Jouer
 
 Ouvrir [le jeu publié sur GitHub Pages](https://lechampdelaurore-boop.github.io/quiz-carte-europe/), ou `index.html` dans un navigateur. Cliquer ou toucher un pays sur la carte. Six très petites zones ont un repère discret avec une zone de clic élargie : Andorre, Liechtenstein, Monaco, Saint-Marin, Vatican et Malte. Le Luxembourg dispose uniquement d'une zone de clic élargie invisible ; le pays de Galles, l'Irlande du Nord et le Kosovo se sélectionnent directement par leur forme. Un pays reste jouable après une erreur ou une expiration du chrono, jusqu'à ce qu'il soit correctement trouvé. Le bouton **Choisir un pays au hasard** ne tire que les zones encore à trouver.

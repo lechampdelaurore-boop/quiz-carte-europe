@@ -16,7 +16,8 @@ const context = { countries, countryById, Math: random };
 vm.createContext(context);
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
 vm.runInContext(`
-  ${section('  const landNeighbors = {', '  const legacyCountry =')}
+  ${section('  const landNeighbors = {', '  const europeLegacyCountry =')}
+  const neighbors = landNeighbors;
   ${section('  function shuffle(', '  function normalizeCountryName(')}
   this.landNeighbors = landNeighbors;
   this.qcmChoices = qcmChoices;

@@ -12,7 +12,7 @@ const context = {};
 vm.createContext(context);
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
 vm.runInContext(`
-  ${section('  const countryNamesInSentence = {', '  const legacyCountry =')}
+  ${section('  const countryNamesInSentence = {', '  const europeLegacyCountry =')}
   this.names = countryNamesInSentence;
   this.nameInSentence = nameInSentence;
 `, context);

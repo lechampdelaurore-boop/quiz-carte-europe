@@ -49,15 +49,18 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(`
-  ${section('  const countryNamesInSentence = {', '  const legacyCountry =')}
+  ${section('  const countryNamesInSentence = {', '  const europeLegacyCountry =')}
   ${section('  function count(', '  function element(')}
   let selectedId = 'ROU';
   let answered = false;
   let questionMode = 'qcm';
+  let questionAsk = 'name';
+  const words = { another: 'Un autre pays' };
   let lastRandomId = null;
   function openQuestion(id) { opened.push(id); }
   ${section('  function submitAnswer(', '  function closeQuestion(')}
   ${section('  function randomQuestion(', '  function fittedWidth(')}
+  progress = loadProgress();
 `, context);
 
 assert.equal(vm.runInContext('progress.schemaVersion', context), 5);
