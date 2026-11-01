@@ -14,7 +14,7 @@ const FR = 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/5d34e
 const SOURCES = {
   countries10: NE + 'ne_10m_admin_0_countries.geojson',
   departements: FR + 'departements-avec-outre-mer.geojson',
-  regions: FR + 'regions-version-simplifiee.geojson'
+  regions: FR + 'regions-avec-outre-mer.geojson'
 };
 const ATTRIBUTION = {
   ne: 'Natural Earth (domaine public), naturalearthdata.com',
@@ -314,31 +314,37 @@ const METRO_EXTENT = { west: -5.3, east: 9.7, south: 41.25, north: 51.2 };
 const FR_CONTEXT = { west: -11, east: 18, south: 37, north: 55 };
 const METRO_BOX = { x: 210, y: 10, w: 780, h: 800 };
 const DOM_LAYOUT = [
-  { code: '971', title: 'Guadeloupe', extent: { west: -61.85, east: -60.95, south: 15.8, north: 16.55 } },
-  { code: '972', title: 'Martinique', extent: { west: -61.27, east: -60.77, south: 14.36, north: 14.91 } },
-  { code: '973', title: 'Guyane', extent: { west: -54.7, east: -51.5, south: 2.0, north: 5.85 } },
-  { code: '974', title: 'La Réunion', extent: { west: 55.17, east: 55.88, south: -21.42, north: -20.84 } },
-  { code: '976', title: 'Mayotte', extent: { west: 44.98, east: 45.33, south: -13.04, north: -12.61 } }
+  { code: '971', region: '01', title: 'Guadeloupe', extent: { west: -61.85, east: -60.95, south: 15.8, north: 16.55 } },
+  { code: '972', region: '02', title: 'Martinique', extent: { west: -61.27, east: -60.77, south: 14.36, north: 14.91 } },
+  { code: '973', region: '03', title: 'Guyane', extent: { west: -54.7, east: -51.5, south: 2.0, north: 5.85 } },
+  { code: '974', region: '04', title: 'La Réunion', extent: { west: 55.17, east: 55.88, south: -21.42, north: -20.84 } },
+  { code: '976', region: '06', title: 'Mayotte', extent: { west: 44.98, east: 45.33, south: -13.04, north: -12.61 } }
 ];
 const IDF_INSET = { id: 'ile-de-france', title: 'Paris et petite couronne', box: { x: 10, y: 676, w: 190, h: 134 }, extent: { west: 2.12, east: 2.62, south: 48.71, north: 49.02 }, codes: ['75', '92', '93', '94'] };
 
-function franceLayout() {
+function franceLayout({ idf = true } = {}) {
   const metro = mercatorFit(METRO_EXTENT, METRO_BOX);
   const insets = [];
   const projectors = {};
+  const regionProjectors = {};
   DOM_LAYOUT.forEach((dom, i) => {
     const box = { x: 10, y: 10 + i * 133, w: 190, h: 125 };
     insets.push({ id: dom.code, title: dom.title, x: box.x, y: box.y, w: box.w, h: box.h });
     const inner = { x: box.x + 6, y: box.y + 18, w: box.w - 12, h: box.h - 24 };
-    projectors[dom.code] = mercatorFit(dom.extent, inner);
+    projectors[dom.code] = regionProjectors[dom.region] = mercatorFit(dom.extent, inner);
   });
   const idfInner = { x: IDF_INSET.box.x + 6, y: IDF_INSET.box.y + 18, w: IDF_INSET.box.w - 12, h: IDF_INSET.box.h - 24 };
-  insets.push({ id: IDF_INSET.id, title: IDF_INSET.title, ...IDF_INSET.box });
-  return { metro, projectors, insets, idf: mercatorFit(IDF_INSET.extent, idfInner) };
+  if (idf) insets.push({ id: IDF_INSET.id, title: IDF_INSET.title, ...IDF_INSET.box });
+  return { metro, projectors, regionProjectors, insets, idf: mercatorFit(IDF_INSET.extent, idfInner) };
 }
 
 function franceContext(metro) {
   return contextPaths(metro, FR_CONTEXT, 2);
+}
+function franceExtent(metro) {
+  const [l, t] = metro([FR_CONTEXT.west, FR_CONTEXT.north]);
+  const [r, b] = metro([FR_CONTEXT.east, FR_CONTEXT.south]);
+  return { left: +l.toFixed(1), top: +t.toFixed(1), right: +r.toFixed(1), bottom: +b.toFixed(1) };
 }
 
 function buildFranceDepartements() {
@@ -377,12 +383,47 @@ function buildFranceDepartements() {
   }).sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true }));
   for (const zone of zones) if (!DEP_SENTENCE[zone.id]) throw new Error('Article manquant pour ' + zone.id);
   if (zones.length !== 101) throw new Error('101 départements attendus, ' + zones.length + ' trouvés');
-  const [l, t] = layout.metro([FR_CONTEXT.west, FR_CONTEXT.north]);
-  const [r, b] = layout.metro([FR_CONTEXT.east, FR_CONTEXT.south]);
   writeLevel({
     id: 'france-departements', title: 'Les départements', width: FR_WIDTH, height: FR_HEIGHT,
-    contextExtent: { left: +l.toFixed(1), top: +t.toFixed(1), right: +r.toFixed(1), bottom: +b.toFixed(1) },
+    contextExtent: franceExtent(layout.metro),
     zones, context: franceContext(layout.metro), lines: [], overlay, pins: [], neighbors,
+    insets: layout.insets, attribution: [ATTRIBUTION.fr, ATTRIBUTION.ne].join(' ; ')
+  });
+}
+
+const REGION_SENTENCE = {
+  '11': "l'Île-de-France", '24': 'le Centre-Val de Loire', '27': 'la Bourgogne-Franche-Comté', '28': 'la Normandie',
+  '32': 'les Hauts-de-France', '44': 'le Grand Est', '52': 'les Pays de la Loire', '53': 'la Bretagne',
+  '75': 'la Nouvelle-Aquitaine', '76': "l'Occitanie", '84': "l'Auvergne-Rhône-Alpes", '93': "la Provence-Alpes-Côte d'Azur",
+  '94': 'la Corse', '01': 'la Guadeloupe', '02': 'la Martinique', '03': 'la Guyane', '04': 'La Réunion', '06': 'Mayotte'
+};
+const REGION_ALIASES = {
+  '24': ['Centre'], '27': ['Bourgogne Franche Comté'], '93': ['PACA', "Provence Alpes Côte d'Azur", "Région Sud"],
+  '84': ['Auvergne Rhône Alpes'], '32': ['Hauts de France'], '04': ['Réunion'], '11': ['Île de France', 'Ile de France']
+};
+
+function buildFranceRegions() {
+  const layout = franceLayout({ idf: false });
+  const items = source('regions').features.map(f => ({
+    id: f.properties.code,
+    name: f.properties.nom,
+    polygons: polygonsOf(f.geometry),
+    project: layout.regionProjectors[f.properties.code] || layout.metro
+  }));
+  const { rings } = topoSimplify(items, 0.6, { minArea: 0.8 });
+  const zones = items.map(item => {
+    const r = rings.get(item.id);
+    const p = interiorPoint(r);
+    if (!REGION_SENTENCE[item.id]) throw new Error('Article manquant pour la région ' + item.id);
+    const zone = { id: item.id, name: item.name, inSentence: REGION_SENTENCE[item.id], type: 'area', d: pathOf(r), labelX: p.x, labelY: p.y };
+    if (REGION_ALIASES[item.id]) zone.aliases = REGION_ALIASES[item.id];
+    return zone;
+  }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  if (zones.length !== 18) throw new Error('18 régions attendues, ' + zones.length + ' trouvées');
+  writeLevel({
+    id: 'france-regions', title: 'Les régions', width: FR_WIDTH, height: FR_HEIGHT,
+    contextExtent: franceExtent(layout.metro),
+    zones, context: franceContext(layout.metro), lines: [], overlay: [], pins: [], neighbors: neighborsOf(items),
     insets: layout.insets, attribution: [ATTRIBUTION.fr, ATTRIBUTION.ne].join(' ; ')
   });
 }
@@ -390,6 +431,7 @@ function buildFranceDepartements() {
 // ---------- Index ----------
 
 const LEVELS = {
+  'france-regions': { title: 'Les régions', group: 'France', build: buildFranceRegions },
   'france-departements': { title: 'Les départements', group: 'France', build: buildFranceDepartements }
 };
 
