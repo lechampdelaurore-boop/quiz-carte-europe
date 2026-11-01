@@ -13,6 +13,12 @@ window.GEO_LEVEL_LIST = [
     "file": "data/monde-amerique-nord.js"
   },
   {
+    "id": "monde-amerique-sud",
+    "title": "Les pays d'Amérique du Sud",
+    "group": "Monde",
+    "file": "data/monde-amerique-sud.js"
+  },
+  {
     "id": "monde-continents",
     "title": "Les continents",
     "group": "Monde",
