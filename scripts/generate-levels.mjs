@@ -16,7 +16,9 @@ const SOURCES = {
   departements: FR + 'departements-avec-outre-mer.geojson',
   regions: FR + 'regions-avec-outre-mer.geojson',
   rivers: NE + 'ne_10m_rivers_lake_centerlines.geojson',
-  riversEurope: NE + 'ne_10m_rivers_europe.geojson'
+  riversEurope: NE + 'ne_10m_rivers_europe.geojson',
+  countries50: NE + 'ne_50m_admin_0_countries.geojson',
+  continents50: NE + 'ne_50m_geography_regions_polys.geojson'
 };
 const ATTRIBUTION = {
   ne: 'Natural Earth (domaine public), naturalearthdata.com',
@@ -526,9 +528,170 @@ function buildFranceFleuves() {
   });
 }
 
+// ---------- Monde ----------
+
+// Projection Equal Earth (Šavrič, Patterson, Jenny 2018), méridien central lon0, ajustée dans un cadre.
+const EE = { A1: 1.340264, A2: -0.081106, A3: 0.000893, A4: 0.003796, M: Math.sqrt(3) / 2 };
+function equalEarthRaw(lon, lat) {
+  const l = lon * Math.PI / 180;
+  const t = Math.asin(EE.M * Math.sin(lat * Math.PI / 180));
+  const t2 = t * t, t6 = t2 * t2 * t2;
+  const x = l * Math.cos(t) / (EE.M * (EE.A1 + 3 * EE.A2 * t2 + t6 * (7 * EE.A3 + 9 * EE.A4 * t2)));
+  const y = t * (EE.A1 + EE.A2 * t2 + t6 * (EE.A3 + EE.A4 * t2));
+  return [x, -y];
+}
+// Longitude relative au méridien central, ramenée dans [-180, 180[.
+const wrapLon = (lon, lon0) => ((lon - lon0 + 540) % 360) - 180;
+function equalEarthFit(extent, box) {
+  const samples = [];
+  const west = wrapLon(extent.west, extent.lon0);
+  let east = wrapLon(extent.east, extent.lon0);
+  if (east <= west) east += 360;
+  for (let i = 0; i <= 40; i++) for (let j = 0; j <= 40; j++) {
+    samples.push(equalEarthRaw(west + (east - west) * i / 40, extent.south + (extent.north - extent.south) * j / 40));
+  }
+  const xs = samples.map(p => p[0]);
+  const ys = samples.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const s = Math.min(box.w / (maxX - minX), box.h / (maxY - minY));
+  const ox = box.x + (box.w - (maxX - minX) * s) / 2 - minX * s;
+  const oy = box.y + (isFinite(box.h) ? (box.h - (maxY - minY) * s) / 2 : 0) - minY * s;
+  const project = ([lon, lat]) => {
+    const [x, y] = equalEarthRaw(lon, lat);
+    return [ox + x * s, oy + y * s];
+  };
+  project.scale = s;
+  project.height = Math.ceil((maxY - minY) * s + 2 * box.y);
+  // Anneau en longitudes relatives, sans saut au raccord (un anneau qui traverse le raccord déborde au-delà de 180°).
+  project.ring = ring => {
+    const rel = ring.map(([lon, lat]) => [wrapLon(lon, extent.lon0), lat]);
+    // Un saut de plus de 180° entre deux points voisins signale le raccord : on déroule l'anneau.
+    let jumps = false;
+    for (let i = 1; i < rel.length; i++) if (Math.abs(rel[i][0] - rel[i - 1][0]) > 180) jumps = true;
+    // L'Antarctique fait tout le tour du pôle : il ne se déroule pas.
+    if (jumps && !rel.some(p => p[1] < -85)) for (const p of rel) if (p[0] < 0) p[0] += 360;
+    return rel;
+  };
+  project.extentBox = () => {
+    const corners = [[west, extent.north], [east, extent.north], [west, extent.south], [east, extent.south], [west, 0], [east, 0]].map(([x, y]) => equalEarthRaw(x, y));
+    return { left: +(ox + Math.min(...corners.map(c => c[0])) * s).toFixed(1), top: +(oy + Math.min(...corners.map(c => c[1])) * s).toFixed(1),
+      right: +(ox + Math.max(...corners.map(c => c[0])) * s).toFixed(1), bottom: +(oy + Math.max(...corners.map(c => c[1])) * s).toFixed(1) };
+  };
+  return project;
+}
+// Les anneaux sont réécrits en longitudes relatives : le projecteur reçoit des longitudes déjà relatives.
+function relativeItems(items, project) {
+  return items.map(item => ({
+    ...item,
+    polygons: item.polygons.map(polygon => polygon.map(ring => project.ring(ring))),
+    project: ([lon, lat]) => project([lon, lat])
+  }));
+}
+
+// Contour de la Terre entière dans la projection (décor).
+function earthOutline(project) {
+  const pts = [];
+  for (let lat = -90; lat <= 90; lat += 2) pts.push(project([-180, lat]));
+  for (let lat = 90; lat >= -90; lat -= 2) pts.push(project([180, lat]));
+  return linePath(pts) + 'Z';
+}
+
+const ringCentroid = ring => {
+  let x = 0, y = 0;
+  for (const p of ring) { x += p[0]; y += p[1]; }
+  return [x / ring.length, y / ring.length];
+};
+const pointInRing = ([x, y], ring) => {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+};
+
+const CONTINENTS = [
+  { id: 'afrique', ne: 'AFRICA', name: 'Afrique', inSentence: "l'Afrique" },
+  { id: 'amerique-nord', ne: 'NORTH AMERICA', name: 'Amérique du Nord', inSentence: "l'Amérique du Nord", aliases: ['Amérique'] },
+  { id: 'amerique-sud', ne: 'SOUTH AMERICA', name: 'Amérique du Sud', inSentence: "l'Amérique du Sud", aliases: ['Amérique'] },
+  { id: 'antarctique', ne: 'ANTARCTICA', name: 'Antarctique', inSentence: "l'Antarctique", aliases: ['Antarctide'] },
+  { id: 'asie', ne: 'ASIA', name: 'Asie', inSentence: "l'Asie" },
+  { id: 'europe', ne: 'EUROPE', name: 'Europe', inSentence: "l'Europe" },
+  { id: 'oceanie', ne: 'AUSTRALIA', name: 'Océanie', inSentence: "l'Océanie", aliases: ['Australie'] }
+];
+const NE_CONTINENT = { Africa: 'afrique', 'North America': 'amerique-nord', 'South America': 'amerique-sud', Antarctica: 'antarctique', Asia: 'asie', Europe: 'europe', Oceania: 'oceanie' };
+// Continent d'une île absente des grands contours continentaux de Natural Earth.
+function islandContinent(props, [lon, lat]) {
+  const a3 = props.ADM0_A3;
+  if (['ATF', 'HMD', 'SGS', 'IOT'].includes(a3)) return null;
+  if (['SYC', 'MUS', 'SHN'].includes(a3)) return 'afrique';
+  if (a3 === 'MDV') return 'asie';
+  if (lon < -140 && lat < 30 && lat > -60) return 'oceanie'; // Hawaï, îles du Pacifique
+  if (a3 === 'RUS' && lon > 60) return 'asie';
+  if (props.CONTINENT === 'Europe' && lon < -30) return lat > 12 ? 'amerique-nord' : 'amerique-sud';
+  if (props.CONTINENT === 'Europe' && lon > 40 && lat < 0) return 'afrique'; // La Réunion, Mayotte
+  if (props.CONTINENT === 'Europe' && lon > 150) return 'oceanie'; // Nouvelle-Calédonie
+  return NE_CONTINENT[props.CONTINENT] || null;
+}
+
+function buildMondeContinents() {
+  const extent = { lon0: 0, west: -180, east: 180, south: -90, north: 90 };
+  const project = equalEarthFit(extent, { x: 8, y: 8, w: 984, h: Infinity });
+  const height = project.height;
+  const mainland = source('continents50').features.filter(f => f.properties.FEATURECLA === 'Continent');
+  const polygonsBy = Object.fromEntries(CONTINENTS.map(c => [c.id, []]));
+  const mainRings = [];
+  for (const c of CONTINENTS) {
+    const f = mainland.find(m => m.properties.NAME === c.ne);
+    for (const polygon of polygonsOf(f.geometry)) {
+      polygonsBy[c.id].push(polygon);
+      mainRings.push(polygon[0]);
+    }
+  }
+  // Un contour de pays est déjà couvert si une bonne part de ses sommets tombe dans un grand contour continental.
+  const boxes = mainRings.map(ring => {
+    const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+    return { ring, minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  });
+  const coveredByMainland = ring => {
+    const step = Math.max(1, Math.floor(ring.length / 24));
+    const sample = ring.filter((_, i) => i % step === 0);
+    return boxes.some(b => {
+      const inside = sample.filter(([x, y]) => x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY && pointInRing([x, y], b.ring)).length;
+      return inside / sample.length > 0.25;
+    });
+  };
+  for (const f of source('countries50').features) {
+    for (const polygon of polygonsOf(f.geometry)) {
+      if (coveredByMainland(polygon[0])) continue;
+      const c = ringCentroid(polygon[0]);
+      const continent = islandContinent(f.properties, c);
+      if (continent) polygonsBy[continent].push(polygon);
+    }
+  }
+  const items = relativeItems(CONTINENTS.map(c => ({ id: c.id, polygons: polygonsBy[c.id] })), project);
+  const { rings } = topoSimplify(items, 0.5, { minArea: 0.3 });
+  const zones = CONTINENTS.map(c => {
+    const r = rings.get(c.id);
+    const p = interiorPoint(r);
+    const zone = { id: c.id, name: c.name, inSentence: c.inSentence, type: 'area', d: pathOf(r), labelX: p.x, labelY: p.y };
+    if (c.aliases) zone.aliases = c.aliases;
+    return zone;
+  });
+  writeLevel({
+    id: 'monde-continents', title: 'Les continents', width: 1000, height,
+    contextExtent: { left: 0, top: 0, right: 1000, bottom: height },
+    zones, context: [], lines: [earthOutline(project)], overlay: [], pins: [],
+    neighbors: { afrique: ['asie', 'europe'], 'amerique-nord': ['amerique-sud'], 'amerique-sud': ['amerique-nord'], antarctique: [], asie: ['afrique', 'europe', 'oceanie'], europe: ['afrique', 'asie'], oceanie: ['asie'] },
+    insets: [], attribution: ATTRIBUTION.ne, projection: 'Equal Earth'
+  });
+}
+
 // ---------- Index ----------
 
 const LEVELS = {
+  'monde-continents': { title: 'Les continents', group: 'Monde', build: buildMondeContinents },
   'france-fleuves': { title: 'Les fleuves et rivières', group: 'France', build: buildFranceFleuves },
   'france-regions': { title: 'Les régions', group: 'France', build: buildFranceRegions },
   'france-departements': { title: 'Les départements', group: 'France', build: buildFranceDepartements }
