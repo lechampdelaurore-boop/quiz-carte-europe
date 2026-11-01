@@ -7,6 +7,12 @@ window.GEO_LEVEL_LIST = [
     "file": "data/monde-afrique.js"
   },
   {
+    "id": "monde-amerique-nord",
+    "title": "Les pays d'Amérique du Nord",
+    "group": "Monde",
+    "file": "data/monde-amerique-nord.js"
+  },
+  {
     "id": "monde-continents",
     "title": "Les continents",
     "group": "Monde",
