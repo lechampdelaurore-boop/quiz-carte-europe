@@ -1048,6 +1048,28 @@
     renderMap();
   }
 
+  // Taille utile d'une zone en plusieurs morceaux : on ignore les petites îles lointaines
+  // (sinon l'Océanie, avec ses îles du Pacifique, couvrirait toute la carte et ne serait jamais zoomée).
+  function mainBox(id) {
+    const country = countryById.get(id);
+    const d = country.dInset || country.d;
+    if (!d || country.type === 'line') return null;
+    const parts = d.split('M').filter(Boolean).map(part => {
+      const n = (part.match(/-?\d*\.?\d+(?:e-?\d+)?/g) || []).map(Number);
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let i = 0; i + 1 < n.length; i += 2) {
+        x0 = Math.min(x0, n[i]); x1 = Math.max(x1, n[i]); y0 = Math.min(y0, n[i + 1]); y1 = Math.max(y1, n[i + 1]);
+      }
+      return { x0, y0, x1, y1, area: (x1 - x0) * (y1 - y0) };
+    }).filter(part => Number.isFinite(part.area));
+    if (!parts.length) return null;
+    const biggest = Math.max(...parts.map(part => part.area));
+    const kept = parts.filter(part => part.area >= biggest * 0.1);
+    const x0 = Math.min(...kept.map(part => part.x0)), x1 = Math.max(...kept.map(part => part.x1));
+    const y0 = Math.min(...kept.map(part => part.y0)), y1 = Math.max(...kept.map(part => part.y1));
+    return { width: x1 - x0, height: y1 - y0 };
+  }
+
   function focusCountry(id) {
     const { x, y, box, pin } = zoneCenter(id);
     zoom = level.focusZoom || 1.55;
@@ -1059,10 +1081,13 @@
       const fittedHeight = fittedWidth() * map.height / map.width;
       zoom *= Math.max(1, viewport.clientHeight / fittedHeight);
       const pixelsPerUnit = fittedWidth() / map.width;
-      const zoneWidth = Math.max(pin ? 30 : box.width, 1) * pixelsPerUnit;
-      const zoneHeight = Math.max(pin ? 30 : box.height, 1) * pixelsPerUnit;
+      const size = pin ? { width: 30, height: 30 } : mainBox(id) || box;
+      const zoneWidth = Math.max(size.width, 1) * pixelsPerUnit;
+      const zoneHeight = Math.max(size.height, 1) * pixelsPerUnit;
       const wanted = 0.4 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
-      zoom = Math.min(Math.max(zoom, wanted), Math.max(zoom, 3.5));
+      // Mais une grande zone (continent, Canada, Brésil…) doit rester entière dans le cadre.
+      const fits = 0.9 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
+      zoom = Math.max(0.85, Math.min(Math.max(zoom, wanted), Math.max(zoom, 3.5), fits));
     }
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
