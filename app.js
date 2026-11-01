@@ -104,10 +104,10 @@
   const historyLimit = 5000;
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.getElementById('europe-map');
-  const miniMap = document.getElementById('mini-map');
+  const gameLayout = document.querySelector('.game-layout');
+  const mapCard = document.querySelector('.map-card');
   const viewport = document.getElementById('map-viewport');
   const mapTooltip = document.getElementById('map-tooltip');
-  const quizPanel = document.getElementById('quiz-panel');
   const question = document.getElementById('quiz-question');
   const emptyQuestion = document.getElementById('quiz-empty');
   const autoZoom = document.getElementById('auto-zoom');
@@ -632,21 +632,11 @@
       pinLayer.append(group);
     }
     svg.append(pinLayer);
-    buildMiniMap();
     zoom = 1;
     panX = 0;
     panY = 0;
     updateUI();
     renderMap();
-  }
-
-  function buildMiniMap() {
-    miniMap.replaceChildren(decorLayer(map.context, 'context-country'));
-    for (const country of countries) {
-      for (const d of [country.d, country.dInset].filter(Boolean)) {
-        miniMap.append(element('path', { d, class: `preview-country${country.type === 'line' ? ' preview-line' : ''}`, 'data-preview-country': country.id }));
-      }
-    }
   }
 
   // The shape to frame for a zone: its enlarged inset copy when there is one.
@@ -661,25 +651,6 @@
     if (country.dInset && Number.isFinite(country.insetLabelX)) return { x: country.insetLabelX, y: country.insetLabelY, box };
     if (Number.isFinite(country.labelX) && Number.isFinite(country.labelY)) return { x: country.labelX, y: country.labelY, box };
     return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
-  }
-
-  function updateMiniMap(id) {
-    for (const path of miniMap.querySelectorAll('.preview-country')) {
-      path.classList.toggle('active', path.dataset.previewCountry === id);
-    }
-    miniMap.querySelector('.preview-pin')?.remove();
-    const pin = map.pins.find(item => item.id === id);
-    if (pin && pin.visible !== false) miniMap.append(element('circle', { cx: pin.x, cy: pin.y, r: 9, class: 'preview-pin' }));
-    const box = zoneShape(id).getBBox();
-    const left = Math.max(0, box.x), right = Math.min(map.width, box.x + box.width);
-    const top = Math.max(0, box.y), bottom = Math.min(map.height, box.y + box.height);
-    const center = zoneCenter(id);
-    const centerX = center.x;
-    const centerY = center.y;
-    const span = Math.min(790, Math.max(275, (right - left) * 1.9, (bottom - top) * 3.6));
-    const aspectRatio = miniMap.clientWidth / miniMap.clientHeight || 2.8;
-    const viewHeight = span / aspectRatio;
-    miniMap.setAttribute('viewBox', `${centerX - span / 2} ${centerY - viewHeight / 2} ${span} ${viewHeight}`);
   }
 
   function updateUI() {
@@ -820,13 +791,14 @@
     }
     emptyQuestion.hidden = true;
     question.hidden = false;
-    updateMiniMap(id);
+    gameLayout.classList.add('en-question');
     startQuestionTimer();
     if (autoZoom.checked) focusCountry(id);
     updateUI();
     if (questionMode === 'open') freeAnswerInput.focus();
     else answers.querySelector('button')?.focus();
-    if (window.matchMedia('(max-width: 850px)').matches) quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Sur téléphone, les réponses sont juste sous la grande carte : on remonte la carte en haut de l'écran.
+    if (window.matchMedia('(max-width: 850px)').matches) mapCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function submitAnswer(chosenId, enteredText = null, timedOut = false) {
@@ -979,6 +951,7 @@
     stopQuestionTimer();
     question.hidden = true;
     emptyQuestion.hidden = false;
+    gameLayout.classList.remove('en-question');
     selectedId = null;
     answered = false;
     feedback.className = 'feedback';

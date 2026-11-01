@@ -14,10 +14,10 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="description" content="Un jeu pour apprendre la géographie sur une carte interactive : pays, régions, départements, fleuves et continents.">
   <title>Géographie à la carte</title>
-  <link rel="stylesheet" href="styles.css?v=20261101-recompenses">
+  <link rel="stylesheet" href="styles.css?v=20261101-reponses-sous-carte">
   <script defer src="data/index.js"></script>
   <script defer src="creatures.js?v=20261101-30"></script>
-  <script defer src="app.js?v=20261101-recompenses"></script>
+  <script defer src="app.js?v=20261101-reponses-sous-carte"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -73,7 +73,6 @@
               <div class="quiz-timer" id="quiz-timer" role="timer" aria-label="Temps restant" hidden><span>Temps restant</span><strong id="timer-value">0:30</strong></div>
               <h2 id="quiz-title">Quel est ce pays ?</h2>
               <p id="quiz-hint"></p>
-              <div class="question-preview" aria-label="Aperçu de la zone sélectionnée"><svg id="mini-map" role="img" aria-label="La zone à identifier est colorée en orange"></svg></div>
               <div class="answers" id="answers"></div>
               <form class="free-answer" id="free-answer-form" hidden>
                 <label for="free-answer-input" id="free-answer-label">Nom du pays</label>

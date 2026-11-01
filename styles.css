@@ -434,13 +434,6 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .quiz-timer strong { font: 700 1.2rem/1 var(--display); font-variant-numeric: tabular-nums; }
 .quiz-timer.urgent { background: var(--tint-retry); }
 .close-button { position: absolute; top: -6px; right: -4px; width: 40px; height: 40px; display: grid; place-items: center; border: 2px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); box-shadow: 0 3px 0 var(--line); font: 700 1.3rem/1 var(--display); }
-.question-preview { display: none; height: 130px; margin: 0 0 12px; overflow: hidden; border: var(--bord) solid var(--line); border-radius: 18px; background: var(--sea); }
-.question-preview svg { display: block; width: 100%; height: 100%; }
-.preview-country { fill: var(--zone); stroke: var(--zone-line); stroke-width: 1.2; vector-effect: non-scaling-stroke; fill-rule: evenodd; }
-.preview-country.active { fill: var(--sun); stroke-width: 2.6; }
-.preview-country.preview-line { fill: none; stroke: var(--river); stroke-width: 3; }
-.preview-country.preview-line.active { fill: none; stroke: var(--sun); stroke-width: 6; }
-.preview-pin { fill: var(--sun); stroke: var(--zone-line); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .answer { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; border: var(--bord) solid var(--line); border-radius: var(--r-touche); background: var(--surface); color: var(--ink); box-shadow: 0 4px 0 var(--line); text-align: left; font: 600 1rem/1.15 var(--display); }
 .answer:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
@@ -555,7 +548,11 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
   .progress-card { order: 2; }
   .random-button { order: 1; }
   .quiz-card { order: 3; min-height: 200px; overflow: visible; }
-  .question-preview { display: block; }
+  /* Pendant une question, les réponses passent juste sous la grande carte (plus de mini-carte). */
+  .en-question .quiz-card { order: 1; min-height: 0; }
+  .en-question .random-button { order: 2; }
+  .en-question .progress-card { order: 3; }
+  .en-question .map-instruction { display: none; }
   .footnote { margin: 4px 4px 18px; }
 }
 @media (max-width: 600px) {
