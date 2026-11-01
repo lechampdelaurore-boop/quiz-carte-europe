@@ -1054,11 +1054,15 @@
     // Sur téléphone, la carte est haute : on zoome davantage sur les petites zones pour qu'elles restent bien visibles
     // (la zone occupe environ 40 % du plus petit côté de la carte, sans dépasser le zoom maximal).
     if (window.matchMedia('(max-width: 850px)').matches && (box || pin)) {
+      // Carte large (Asie, continents…) dans un cadre haut : sans ça, même zoomée elle tient entière en hauteur
+      // et ne peut pas se recentrer. Le zoom de base part donc d'une carte qui remplit toute la hauteur du cadre.
+      const fittedHeight = fittedWidth() * map.height / map.width;
+      zoom *= Math.max(1, viewport.clientHeight / fittedHeight);
       const pixelsPerUnit = fittedWidth() / map.width;
       const zoneWidth = Math.max(pin ? 30 : box.width, 1) * pixelsPerUnit;
       const zoneHeight = Math.max(pin ? 30 : box.height, 1) * pixelsPerUnit;
       const wanted = 0.4 * Math.min(viewport.clientWidth / zoneWidth, viewport.clientHeight / zoneHeight);
-      zoom = Math.max(zoom, Math.min(3.5, wanted));
+      zoom = Math.min(Math.max(zoom, wanted), Math.max(zoom, 3.5));
     }
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
