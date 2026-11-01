@@ -175,12 +175,14 @@
         countrySelection: ['all', 'review'].includes(saved?.countrySelection) ? saved.countrySelection : 'discover',
         timedMode: saved?.timedMode === true,
         timerSeconds: validTimerSeconds(saved?.timerSeconds) ?? 30,
-        ask: saved?.ask === 'code' ? 'code' : 'name'
+        ask: saved?.ask === 'code' ? 'code' : 'name',
+        motion: saved?.motion !== false
       };
-    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover', timedMode: false, timerSeconds: 30, ask: 'name' }; }
+    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover', timedMode: false, timerSeconds: 30, ask: 'name', motion: true }; }
   }
 
   const settings = loadSettings();
+  document.documentElement.classList.toggle('calme', !settings.motion);
   function saveSettings() {
     try { localStorage.setItem(settingsKey, JSON.stringify(settings)); } catch (_) { /* The game still works. */ }
   }
@@ -359,6 +361,7 @@
       radio.checked = radio.value === (radio.name === 'answer-mode' ? settings.answerMode : settings.countrySelection);
     }
     timedModeInput.checked = settings.timedMode;
+    document.getElementById('motion-toggle').checked = settings.motion;
     timerSetting.hidden = !settings.timedMode;
     timerSecondsInput.value = settings.timerSeconds;
     timerSecondsInput.removeAttribute('aria-invalid');
@@ -549,6 +552,8 @@
     nodes.get(id).push(node);
   }
 
+  // Found zones are "coloured in" with one of the six pastels, always the same for a zone.
+  const tintOf = id => String([...id].reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 7), 0) % 4);
   const anonymousLabel = id => `${words.one[0].toUpperCase()}${words.one.slice(1)} à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`;
 
   function decorLayer(paths, className) {
@@ -582,7 +587,7 @@
     for (const country of countries) {
       if (country.type === 'line') {
         const group = element('g', { class: 'country country-line', 'data-country': country.id });
-        group.append(element('path', { d: country.d, class: 'line-hit' }), element('path', { d: country.d, class: 'line-stroke' }));
+        group.append(element('path', { d: country.d, class: 'line-hit' }), element('path', { d: country.d, class: 'line-casing' }), element('path', { d: country.d, class: 'line-stroke' }));
         registerCountry(group, country.id);
         countryLayer.append(group);
       } else {
@@ -685,7 +690,7 @@
     document.getElementById('progress-track').setAttribute('aria-valuemax', countries.length);
     document.getElementById('score').textContent = progress.currentGame.score;
     document.getElementById('streak').textContent = progress.currentGame.streak;
-    document.getElementById('progress-ring').style.background = `conic-gradient(var(--teal) ${mastered / countries.length * 100}%, #e9ede6 0%)`;
+    document.getElementById('progress-ring').style.background = `conic-gradient(var(--good) ${mastered / countries.length * 100}%, var(--track) 0%)`;
     document.getElementById('progress-fill').style.width = `${mastered / countries.length * 100}%`;
     document.getElementById('progress-track').setAttribute('aria-valuenow', mastered);
     document.getElementById('progress-caption').textContent = remaining === 0
@@ -710,6 +715,7 @@
         node.classList.toggle('pin-mastered', masteredCountry);
         node.classList.toggle('pin-missed', missedCountry);
         node.classList.toggle('pin-selected', country.id === selectedId);
+        if (masteredCountry) node.dataset.tint = tintOf(country.id); else delete node.dataset.tint;
       }
     }
     const codesEverywhere = !askingCode();
@@ -876,9 +882,10 @@
     document.getElementById('next-button-label').textContent = isGameComplete() ? 'Voir le bilan' : words.another;
     document.getElementById('result-cta-label').textContent = isGameComplete() ? 'Voir le bilan' : words.another;
     resultDialog.dataset.result = correct ? 'good' : 'bad';
-    document.getElementById('result-icon').textContent = correct ? '✓' : '×';
-    document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
-    document.getElementById('result-title').textContent = correct ? 'Bravo !' : timedOut ? 'Temps écoulé !' : 'À réviser !';
+    document.getElementById('result-icon').textContent = correct ? '★' : '↻';
+    document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'À retenter';
+    document.getElementById('result-title').textContent = correct ? 'Bravo !' : timedOut ? 'Temps écoulé !' : 'Presque !';
+    if (!correct && settings.motion) navigator.vibrate?.(120);
     document.getElementById('result-detail').textContent = correct
       ? `Tu as reconnu ${fullInSentence(country)}.`
       : `La bonne réponse était ${fullInSentence(country)}.`;
@@ -1076,7 +1083,7 @@
     document.getElementById('level-title').textContent = level.title;
     document.getElementById('map-question').textContent = `${words.which} est ${words.this} ?`;
     document.getElementById('map-instruction').textContent = `Clique sur ${words.feminine ? 'une' : 'un'} ${words.one}. Glisse pour déplacer la carte ; zoome avec la molette, deux doigts ou +/−.`;
-    document.getElementById('random-label').textContent = `Choisir ${words.feminine ? 'une' : 'un'} ${words.one} au hasard`;
+    document.getElementById('random-label').textContent = `${words.feminine ? 'Une' : 'Un'} ${words.one} au hasard`;
     document.getElementById('map-credit').textContent = map.attribution;
     document.getElementById('history-col-name').textContent = capitalize(words.one);
     const footnote = document.getElementById('footnote');
@@ -1216,6 +1223,10 @@
     if (event.target.name === 'answer-mode') settings.answerMode = event.target.value;
     if (event.target.name === 'country-selection') settings.countrySelection = event.target.value;
     if (event.target.name === 'ask') { settings.ask = event.target.value; updateUI(); }
+    if (event.target.id === 'motion-toggle') {
+      settings.motion = event.target.checked;
+      document.documentElement.classList.toggle('calme', !settings.motion);
+    }
     if (event.target === timedModeInput) {
       settings.timedMode = timedModeInput.checked;
       timerSetting.hidden = !settings.timedMode;

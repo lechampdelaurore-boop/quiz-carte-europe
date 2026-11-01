@@ -15,10 +15,12 @@ const LEVELS = ['europe', ...listContext.window.GEO_LEVEL_LIST.map(level => leve
 
 (async () => {
   fs.mkdirSync('captures', { recursive: true });
-  // Attendre que GitHub Pages serve la version du dépôt (même app.js?v= que index.html).
+  // Attendre que GitHub Pages serve la version du dépôt (même app.js?v= et même liste de niveaux).
+  const expectedList = fs.readFileSync('data/index.js', 'utf8');
   for (let i = 0; ; i++) {
     const live = await fetch(URL + '?nocache=' + Date.now()).then(r => r.text()).catch(() => '');
-    if (expectedApp && live.includes(expectedApp)) { console.log('Version en ligne : ' + expectedApp); break; }
+    const liveList = await fetch(URL + 'data/index.js?nocache=' + Date.now()).then(r => r.text()).catch(() => '');
+    if (expectedApp && live.includes(expectedApp) && liveList === expectedList) { console.log('Version en ligne : ' + expectedApp + ', ' + LEVELS.length + ' niveaux'); break; }
     if (i >= 18) { console.log('Version en ligne différente de ' + expectedApp + ' après 3 min'); process.exit(1); }
     await new Promise(r => setTimeout(r, 10000));
   }
@@ -49,6 +51,7 @@ const LEVELS = ['europe', ...listContext.window.GEO_LEVEL_LIST.map(level => leve
         await page.screenshot({ path: `captures/${w}x${h}-${level}-question.png` });
         await page.locator('#answers button').first().click();
         await page.waitForSelector('#result-dialog[open]', { timeout: 5000 });
+        await page.waitForTimeout(1200);
         await page.screenshot({ path: `captures/${w}x${h}-${level}-resultat.png` });
       } catch (error) {
         problems.push(error.message.split('\n')[0]);
