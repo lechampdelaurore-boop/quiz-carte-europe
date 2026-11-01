@@ -25,6 +25,12 @@ window.GEO_LEVEL_LIST = [
     "file": "data/monde-asie.js"
   },
   {
+    "id": "monde-oceanie",
+    "title": "Les pays d'Océanie",
+    "group": "Monde",
+    "file": "data/monde-oceanie.js"
+  },
+  {
     "id": "monde-continents",
     "title": "Les continents",
     "group": "Monde",
