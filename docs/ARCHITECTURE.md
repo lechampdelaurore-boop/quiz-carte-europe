@@ -14,6 +14,21 @@ Application statique sans framework ni serveur applicatif. `index.html` charge `
 
 Les tracés proviennent de Natural Earth 1:10m. `scripts/generate-map.mjs` télécharge une révision épinglée d'Admin 0 Countries et d'Admin 0 Map Units, retient une liste explicite de 50 pays plus les quatre territoires du Royaume-Uni, projette les coordonnées en Mercator et écrit `map-data.js`. La forme `GBR` reste dans le fond neutre et ses quatre unités cartographiques `ENG`, `SCT`, `WLS` et `NIR` deviennent les zones cliquables. L'Irlande (`IRL`) reste indépendante. Les réponses restent limitées à l'Europe ; le fond couvre une région plus large (longitude −80° à 120°, latitude 0° à 85°) pour éviter une coupure visible au dézoom. Si le périmètre géographique change, modifier les listes des noms et éventuellement les points dans ce script, puis régénérer la carte.
 
+## Niveaux
+
+Le menu de niveaux (`#level-button`, `#level-menu`) est construit par `renderLevelMenu` à partir de `levelCatalog` (ordre, groupe, titre, nom des zones : pays, région, département, fleuve, continent). Un niveau est jouable si son fichier est connu : `map-data.js` pour l'Europe, ou une entrée `{ id, title, group, file }` de `window.GEO_LEVEL_LIST` (`data/index.js`). Un niveau listé dans `data/index.js` mais absent du catalogue apparaît quand même, dans son groupe. Les fichiers sont chargés à la demande par `loadScript` ; `normalizeLevel` les convertit au format interne.
+
+`applyLevel` remplace les variables du niveau courant (`map`, `countries`, `countryById`, `neighbors`, `storageKey`, `legacyCountry`, `words`), recharge la progression du niveau, met à jour les textes (`applyLevelTexts`) et redessine la carte (`buildMap`). `words` (créé par `makeWords`) accorde les phrases : « cette région », « trouvées », « Un autre fleuve ». Le niveau choisi est enregistré sous `atlas-club-level`. `?niveau=<id>` est prioritaire.
+
+Objet d'un fichier `data/<id>.js` : `(window.GEO_LEVELS ||= {})["<id>"] = { id, title, width, height, contextExtent, zones, context, lines, overlay, pins, neighbors, insets, attribution }`. Coordonnées déjà projetées dans le repère `0 0 width height`.
+
+- `zones[]` : `{ id, name, inSentence, type, d, label?, labelX?, labelY?, dInset?, insetLabelX?, insetLabelY?, aliases?, kind? }`. `type` vaut `"area"` (surface) ou `"line"` (fleuve, tracé ouvert : trait épais et cible tactile de 22 px via `.line-hit`). `label` est le numéro de département, placé en `labelX/labelY`. `dInset` est une copie agrandie dans un encadré (Paris et petite couronne) : les deux tracés sont cliquables, le zoom et l'aperçu visent la copie agrandie, et le numéro s'affiche dans l'encadré. `aliases` complète la réponse libre.
+- `context` : terres non cliquables ; `lines` : décor non cliquable ; `overlay` : limites tracées au-dessus des zones (régions sur la carte des départements) ; `insets` : cadres `{ id, title, x, y, w, h }` ; `neighbors` : frontières communes, pour le piège du QCM ; `pins` : comme pour l'Europe.
+
+Numéros : quand le niveau a des `label`, le réglage `settings.ask` (`"name"` ou `"code"`) apparaît. En mode nom, tous les numéros sont affichés et les réponses montrent les noms ; en mode numéro, la question donne le nom, les choix sont des numéros, la réponse libre accepte « 1 » pour « 01 » et « 2a » pour « 2A » (`matchTypedCode`), et seuls les numéros trouvés restent visibles. Les numéros sont masqués quand la carte fait moins de 560 px de large (`labels-crowded`) ; ils gardent 11 px à l'écran à tous les zooms. Les messages ajoutent le numéro au nom (« la Gironde (33) »).
+
+Le QCM propose `min(6, nombre de zones)` choix. Les tests (`tests/*.cjs`) portent sur le niveau Europe.
+
 ## Cycle d'une question
 
 1. Un clic, une activation clavier ou le bouton aléatoire choisit un identifiant de pays encore absent de `currentGame.foundIds`. Un clic direct sur la carte ignore le filtre de tirage, mais pas la fin de partie.

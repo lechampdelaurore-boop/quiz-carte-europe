@@ -1,9 +1,47 @@
 (() => {
   'use strict';
 
-  const map = window.EUROPE_MAP;
-  const countries = map.countries;
-  const countryById = new Map(countries.map(country => [country.id, country]));
+  // Levels shown in the menu, in order. A level becomes playable when its data file is listed in
+  // window.GEO_LEVEL_LIST (data/index.js, produced with the map data) or, for Europe, with map-data.js.
+  const levelCatalog = [
+    { id: 'france-regions', group: 'France', title: 'Les régions', noun: 'region' },
+    { id: 'france-departements', group: 'France', title: 'Les départements', noun: 'departement' },
+    { id: 'france-fleuves', group: 'France', title: 'Les fleuves et rivières', noun: 'coursDEau' },
+    { id: 'europe', group: 'Europe', title: "Les pays d'Europe", noun: 'pays', file: 'map-data.js?v=20261011-small-markers' },
+    { id: 'monde-continents', group: 'Monde', title: 'Les continents', noun: 'continent', focusZoom: 1 },
+    { id: 'monde-afrique', group: 'Monde', title: "Pays d'Afrique", noun: 'pays' },
+    { id: 'monde-amerique-nord', group: 'Monde', title: "Pays d'Amérique du Nord", noun: 'pays' },
+    { id: 'monde-amerique-sud', group: 'Monde', title: "Pays d'Amérique du Sud", noun: 'pays' },
+    { id: 'monde-asie', group: 'Monde', title: "Pays d'Asie", noun: 'pays' },
+    { id: 'monde-oceanie', group: 'Monde', title: "Pays d'Océanie", noun: 'pays' }
+  ];
+  const nouns = {
+    pays: { one: 'pays', many: 'pays', feminine: false },
+    region: { one: 'région', many: 'régions', feminine: true },
+    departement: { one: 'département', many: 'départements', feminine: false },
+    coursDEau: { one: "cours d'eau", many: "cours d'eau", feminine: false },
+    continent: { one: 'continent', many: 'continents', feminine: false },
+    zone: { one: 'zone', many: 'zones', feminine: true }
+  };
+  // French wording for the current level's kind of zone ("ce pays", "cette région", "trouvées"...).
+  function makeWords(noun) {
+    const vowel = /^[aeiouyéèêh]/i.test(noun.one);
+    return {
+      ...noun,
+      this: `${noun.feminine ? 'cette' : vowel ? 'cet' : 'ce'} ${noun.one}`,
+      which: noun.feminine ? 'Quelle' : 'Quel',
+      another: `${noun.feminine ? 'Une autre' : 'Un autre'} ${noun.one}`,
+      count: n => `${n} ${n > 1 ? noun.many : noun.one}`,
+      found: n => `trouvé${noun.feminine ? 'e' : ''}${n > 1 ? 's' : ''}`,
+      missed: n => `raté${noun.feminine ? 'e' : ''}${n > 1 ? 's' : ''}`
+    };
+  }
+  let level = null;
+  let words = makeWords(nouns.pays);
+  let map = null;
+  let countries = [];
+  let countryById = new Map();
+  let neighbors = {};
   // Land borders between playable zones, from the pinned Natural Earth 10m countries and map units.
   // UK map units are separate quiz answers; islands without a playable land neighbor have [].
   const landNeighbors = {
@@ -53,10 +91,15 @@
     SVN: 'la Slovénie', SWE: 'la Suède', CHE: 'la Suisse', CZE: 'la Tchéquie',
     TUR: 'la Turquie', UKR: "l'Ukraine", VAT: 'le Vatican'
   };
-  const nameInSentence = country => countryNamesInSentence[country.id] || country.name;
-  const legacyCountry = { id: 'GBR', name: 'Royaume-Uni (ancien quiz)' };
-  const knownCountryId = id => countryById.has(id) || id === legacyCountry.id;
-  const storageKey = 'atlas-club-europe-v1';
+  const nameInSentence = country => country.inSentence || countryNamesInSentence[country.id] || country.name;
+  // Department numbers are shown next to the name ("la Gironde (33)").
+  const fullInSentence = country => nameInSentence(country) + (country.label ? ` (${country.label})` : '');
+  const fullName = country => country.name + (country.label ? ` (${country.label})` : '');
+  const europeLegacyCountry = { id: 'GBR', name: 'Royaume-Uni (ancien quiz)' };
+  let legacyCountry = europeLegacyCountry;
+  const knownCountryId = id => countryById.has(id) || (legacyCountry !== null && id === legacyCountry.id);
+  let storageKey = 'atlas-club-europe-v1';
+  const levelKey = 'atlas-club-level';
   const settingsKey = 'atlas-club-settings-v1';
   const historyLimit = 5000;
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -87,9 +130,13 @@
   const resultAdvance = document.getElementById('result-advance');
   const nodes = new Map();
   const pinGroups = [];
+  const codeLabels = [];
+  let levelHasCodes = false;
+  const askingCode = () => levelHasCodes && settings.ask === 'code';
   let selectedId = null;
   let answered = false;
   let questionMode = 'qcm';
+  let questionAsk = 'name';
   let lastRandomId = null;
   let zoom = 1;
   let panX = 0;
@@ -127,9 +174,10 @@
         answerMode: saved?.answerMode === 'open' ? 'open' : 'qcm',
         countrySelection: ['all', 'review'].includes(saved?.countrySelection) ? saved.countrySelection : 'discover',
         timedMode: saved?.timedMode === true,
-        timerSeconds: validTimerSeconds(saved?.timerSeconds) ?? 30
+        timerSeconds: validTimerSeconds(saved?.timerSeconds) ?? 30,
+        ask: saved?.ask === 'code' ? 'code' : 'name'
       };
-    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover', timedMode: false, timerSeconds: 30 }; }
+    } catch (_) { return { answerMode: 'qcm', countrySelection: 'discover', timedMode: false, timerSeconds: 30, ask: 'name' }; }
   }
 
   const settings = loadSettings();
@@ -154,7 +202,7 @@
       const saved = JSON.parse(localStorage.getItem(storageKey));
       if (saved && typeof saved === 'object' && saved.stats && typeof saved.stats === 'object' && !Array.isArray(saved.stats)) {
         const progress = emptyProgress();
-        for (const country of [...countries, legacyCountry]) {
+        for (const country of [...countries, ...(legacyCountry ? [legacyCountry] : [])]) {
           const old = saved.stats[country.id];
           if (!old || typeof old !== 'object') continue;
           const attempts = count(old.attempts);
@@ -207,7 +255,7 @@
     return emptyProgress();
   }
 
-  let progress = loadProgress();
+  let progress = emptyProgress();
   const hasFound = id => progress.currentGame.foundIds.includes(id);
   const isGameComplete = () => progress.currentGame.foundIds.length === countries.length;
   function saveProgress() {
@@ -218,7 +266,6 @@
     lastRandomId = null;
     saveProgress();
   }
-  updateSettingsInfo();
 
   function element(name, attributes = {}) {
     const node = document.createElementNS(svgNS, name);
@@ -236,10 +283,11 @@
   }
 
   function qcmChoices(id) {
-    const neighbors = (landNeighbors[id] || []).filter(neighborId => countryById.has(neighborId));
-    const neighborId = neighbors.length ? neighbors[Math.floor(Math.random() * neighbors.length)] : null;
+    const close = (neighbors[id] || []).filter(neighborId => countryById.has(neighborId));
+    const neighborId = close.length ? close[Math.floor(Math.random() * close.length)] : null;
+    const total = Math.min(6, countries.length);
     const distractors = shuffle(countries.filter(country => country.id !== id && country.id !== neighborId))
-      .slice(0, neighborId ? 4 : 5);
+      .slice(0, total - (neighborId ? 2 : 1));
     return shuffle([countryById.get(id), ...(neighborId ? [countryById.get(neighborId)] : []), ...distractors]);
   }
 
@@ -278,7 +326,7 @@
     let bestDistance = Infinity;
     let tied = false;
     for (const country of countries) {
-      const names = [country.name, ...(countryAliases[country.id] || [])];
+      const names = [country.name, ...(country.aliases || [])];
       for (const name of names) {
         const normalized = normalizeCountryName(name);
         const distance = editDistance(typed, normalized);
@@ -296,6 +344,16 @@
     return tied ? null : bestId;
   }
 
+  // Department numbers: "1", "01" and "01 " all match "01"; "2a" matches "2A".
+  function matchTypedCode(value) {
+    const typed = value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+    if (!typed) return null;
+    const exact = countries.find(country => country.label && country.label.toUpperCase() === typed);
+    if (exact) return exact.id;
+    const numeric = /^\d+$/.test(typed) ? countries.find(country => /^\d+$/.test(country.label || '') && Number(country.label) === Number(typed)) : null;
+    return numeric ? numeric.id : null;
+  }
+
   function updateSettingsInfo() {
     for (const radio of settingsDialog.querySelectorAll('input[type="radio"]')) {
       radio.checked = radio.value === (radio.name === 'answer-mode' ? settings.answerMode : settings.countrySelection);
@@ -305,10 +363,12 @@
     timerSecondsInput.value = settings.timerSeconds;
     timerSecondsInput.removeAttribute('aria-invalid');
     timerError.hidden = true;
+    for (const radio of settingsDialog.querySelectorAll('input[name="ask"]')) radio.checked = radio.value === settings.ask;
+    document.getElementById('ask-setting').hidden = !levelHasCodes;
     const difficultCount = countries.filter(country => progress.stats[country.id]?.wrongAttempts > 0 && !hasFound(country.id)).length;
     document.getElementById('settings-note').textContent = difficultCount
-      ? `${difficultCount} pays déjà raté${difficultCount > 1 ? 's' : ''} à retrouver. Les réglages s'appliquent à la prochaine question.`
-      : 'Un pays reste à jouer jusqu’à sa première bonne réponse. « À réviser » privilégie les pays avec des erreurs enregistrées.';
+      ? `${words.count(difficultCount)} déjà ${words.missed(difficultCount)} à retrouver. Les réglages s'appliquent à la prochaine question.`
+      : `${words.feminine ? 'Une' : 'Un'} ${words.one} reste à jouer jusqu’à sa première bonne réponse. « À réviser » privilégie les ${words.many} avec des erreurs enregistrées.`;
     updateEmptyHint();
   }
 
@@ -317,10 +377,10 @@
     document.querySelector('#quiz-empty h2').textContent = complete ? 'Partie terminée !' : 'À toi de jouer';
     document.getElementById('new-game-finished').hidden = !complete;
     document.getElementById('quiz-empty-hint').textContent = complete
-      ? `${countries.length} pays trouvés · ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}. Lance une nouvelle partie pour rejouer.`
+      ? `${words.count(countries.length)} ${words.found(countries.length)} · ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}. Lance une nouvelle partie pour rejouer.`
       : settings.answerMode === 'open'
-        ? 'Sélectionne un pays non trouvé sur la carte, puis écris son nom ici.'
-        : 'Sélectionne un pays non trouvé sur la carte pour afficher les six propositions ici.';
+        ? `Sélectionne ${words.feminine ? 'une' : 'un'} ${words.one} non ${words.found(1)} sur la carte, puis écris ${askingCode() ? 'son numéro' : 'son nom'} ici.`
+        : `Sélectionne ${words.feminine ? 'une' : 'un'} ${words.one} non ${words.found(1)} sur la carte pour afficher les propositions ici.`;
   }
 
   function showTimerInputError() {
@@ -341,14 +401,14 @@
 
   const historyDate = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
   function renderHistory() {
-    const ordered = [...countries, ...(progress.stats.GBR ? [legacyCountry] : [])].sort((first, second) =>
+    const ordered = [...countries, ...(legacyCountry && progress.stats[legacyCountry.id] ? [legacyCountry] : [])].sort((first, second) =>
       (progress.stats[second.id]?.wrongAttempts || 0) - (progress.stats[first.id]?.wrongAttempts || 0)
       || first.name.localeCompare(second.name, 'fr'));
     const totalErrors = ordered.reduce((total, country) => total + (progress.stats[country.id]?.wrongAttempts || 0), 0);
     const countriesWithErrors = ordered.filter(country => progress.stats[country.id]?.wrongAttempts > 0).length;
     const maxErrors = progress.stats[ordered[0].id]?.wrongAttempts || 0;
     document.getElementById('history-summary').textContent = totalErrors
-      ? `${totalErrors} erreur${totalErrors > 1 ? 's' : ''} sur ${countriesWithErrors} pays.`
+      ? `${totalErrors} erreur${totalErrors > 1 ? 's' : ''} sur ${words.count(countriesWithErrors)}.`
       : 'Aucune erreur enregistrée pour le moment.';
     const rows = ordered.map(country => {
       const stat = progress.stats[country.id];
@@ -361,7 +421,7 @@
       name.setAttribute('role', 'cell');
       const label = document.createElement('span');
       label.className = 'history-country-name';
-      label.textContent = country.name;
+      label.textContent = fullName(country);
       name.append(label);
       if (errors) {
         const bar = document.createElement('span');
@@ -387,7 +447,8 @@
       const date = new Date(item.at);
       const when = Number.isNaN(date.getTime()) ? '' : ` · ${historyDate.format(date)}`;
       const outcome = item.timedOut ? 'temps écoulé' : item.correct ? 'juste' : 'faux';
-      entry.textContent = `${countryById.get(item.countryId)?.name || legacyCountry.name} — ${outcome}${when}`;
+      const zone = countryById.get(item.countryId);
+      entry.textContent = `${zone ? fullName(zone) : legacyCountry?.name || item.countryId} — ${outcome}${when}`;
       return entry;
     });
     if (!recent.length) {
@@ -423,7 +484,7 @@
     clearTimeout(tooltipTimer);
     tooltipCountryId = id;
     tooltipFromTouch = fromTouch;
-    mapTooltip.textContent = countryById.get(id).name;
+    mapTooltip.textContent = fullName(countryById.get(id));
     mapTooltip.hidden = false;
     positionCountryTooltip(clientX, clientY);
     if (fromTouch) tooltipTimer = setTimeout(hideCountryTooltip, 4000);
@@ -443,7 +504,7 @@
     const pointerCountry = event => isPin ? nearestPinId(event.clientX, event.clientY) : id;
     node.setAttribute('tabindex', '0');
     node.setAttribute('role', 'button');
-    node.setAttribute('aria-label', `Zone de pays à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`);
+    node.setAttribute('aria-label', anonymousLabel(id));
     node.addEventListener('click', event => {
       if (suppressClick) { suppressClick = false; return; }
       const targetId = isPin && event.detail !== 0 ? pointerCountry(event) : id;
@@ -488,19 +549,70 @@
     nodes.get(id).push(node);
   }
 
+  const anonymousLabel = id => `${words.one[0].toUpperCase()}${words.one.slice(1)} à identifier, numéro ${countries.findIndex(country => country.id === id) + 1}`;
+
+  function decorLayer(paths, className) {
+    const layer = element('g', { 'aria-hidden': 'true', class: `${className}-layer` });
+    for (const d of paths || []) layer.append(element('path', { d, class: className }));
+    return layer;
+  }
+
   function buildMap() {
+    svg.replaceChildren();
+    nodes.clear();
+    pinGroups.length = 0;
+    codeLabels.length = 0;
     svg.setAttribute('viewBox', `0 0 ${map.width} ${map.height}`);
-    const contextLayer = element('g', { 'aria-hidden': 'true' });
-    for (const d of map.context) contextLayer.append(element('path', { d, class: 'context-country' }));
-    svg.append(contextLayer);
+    svg.setAttribute('aria-label', `Carte interactive : ${level.title.toLowerCase()}`);
+    svg.append(decorLayer(map.context, 'context-country'));
+
+    const insetLayer = element('g', { 'aria-hidden': 'true' });
+    for (const inset of map.insets || []) {
+      insetLayer.append(element('rect', { x: inset.x, y: inset.y, width: inset.w, height: inset.h, rx: 6, class: 'inset-frame' }));
+      if (inset.title) {
+        const title = element('text', { x: inset.x + 6, y: inset.y + 14, class: 'inset-title' });
+        title.textContent = inset.title;
+        insetLayer.append(title);
+      }
+    }
+    svg.append(insetLayer);
+    svg.append(decorLayer(map.lines, 'decor-line'));
 
     const countryLayer = element('g');
     for (const country of countries) {
-      const path = element('path', { d: country.d, class: 'country', 'data-country': country.id });
-      registerCountry(path, country.id);
-      countryLayer.append(path);
+      if (country.type === 'line') {
+        const group = element('g', { class: 'country country-line', 'data-country': country.id });
+        group.append(element('path', { d: country.d, class: 'line-hit' }), element('path', { d: country.d, class: 'line-stroke' }));
+        registerCountry(group, country.id);
+        countryLayer.append(group);
+      } else {
+        const path = element('path', { d: country.d, class: 'country', 'data-country': country.id });
+        registerCountry(path, country.id);
+        countryLayer.append(path);
+        // Enlarged copy in an inset (Paris and the inner suburbs): same zone, second clickable shape.
+        if (country.dInset) {
+          const copy = element('path', { d: country.dInset, class: 'country', 'data-country': country.id });
+          registerCountry(copy, country.id);
+          countryLayer.append(copy);
+        }
+      }
     }
     svg.append(countryLayer);
+    svg.append(decorLayer(map.overlay, 'overlay-line'));
+
+    const labelLayer = element('g', { 'aria-hidden': 'true', class: 'code-labels' });
+    for (const country of countries) {
+      if (!country.label) continue;
+      const inset = Number.isFinite(country.insetLabelX) && Number.isFinite(country.insetLabelY);
+      const x = inset ? country.insetLabelX : country.labelX;
+      const y = inset ? country.insetLabelY : country.labelY;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const text = element('text', { x, y, class: 'code-label', 'data-country': country.id });
+      text.textContent = country.label;
+      codeLabels.push(text);
+      labelLayer.append(text);
+    }
+    svg.append(labelLayer);
 
     const pinLayer = element('g');
     for (const pin of map.pins) {
@@ -516,18 +628,34 @@
     }
     svg.append(pinLayer);
     buildMiniMap();
+    zoom = 1;
+    panX = 0;
+    panY = 0;
     updateUI();
     renderMap();
-    new ResizeObserver(renderMap).observe(viewport);
   }
 
   function buildMiniMap() {
-    const backdrop = element('g', { 'aria-hidden': 'true' });
-    for (const d of map.context) backdrop.append(element('path', { d, class: 'context-country' }));
-    miniMap.append(backdrop);
+    miniMap.replaceChildren(decorLayer(map.context, 'context-country'));
     for (const country of countries) {
-      miniMap.append(element('path', { d: country.d, class: 'preview-country', 'data-preview-country': country.id }));
+      for (const d of [country.d, country.dInset].filter(Boolean)) {
+        miniMap.append(element('path', { d, class: `preview-country${country.type === 'line' ? ' preview-line' : ''}`, 'data-preview-country': country.id }));
+      }
     }
+  }
+
+  // The shape to frame for a zone: its enlarged inset copy when there is one.
+  const zoneShape = id => { const list = nodes.get(id); return list[countryById.get(id).dInset ? 1 : 0] || list[0]; };
+
+  // Point used to center the zoom and the preview: the label point, a pin, or the shape's box.
+  function zoneCenter(id) {
+    const country = countryById.get(id);
+    const pin = map.pins.find(item => item.id === id);
+    if (pin) return { x: pin.x, y: pin.y, pin };
+    const box = zoneShape(id).getBBox();
+    if (country.dInset && Number.isFinite(country.insetLabelX)) return { x: country.insetLabelX, y: country.insetLabelY, box };
+    if (Number.isFinite(country.labelX) && Number.isFinite(country.labelY)) return { x: country.labelX, y: country.labelY, box };
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
   }
 
   function updateMiniMap(id) {
@@ -537,12 +665,12 @@
     miniMap.querySelector('.preview-pin')?.remove();
     const pin = map.pins.find(item => item.id === id);
     if (pin && pin.visible !== false) miniMap.append(element('circle', { cx: pin.x, cy: pin.y, r: 9, class: 'preview-pin' }));
-    const shape = nodes.get(id).find(node => node.tagName.toLowerCase() === 'path');
-    const box = shape.getBBox();
+    const box = zoneShape(id).getBBox();
     const left = Math.max(0, box.x), right = Math.min(map.width, box.x + box.width);
     const top = Math.max(0, box.y), bottom = Math.min(map.height, box.y + box.height);
-    const centerX = pin ? pin.x : (left + right) / 2;
-    const centerY = pin ? pin.y : (top + bottom) / 2;
+    const center = zoneCenter(id);
+    const centerX = center.x;
+    const centerY = center.y;
     const span = Math.min(790, Math.max(275, (right - left) * 1.9, (bottom - top) * 3.6));
     const aspectRatio = miniMap.clientWidth / miniMap.clientHeight || 2.8;
     const viewHeight = span / aspectRatio;
@@ -553,15 +681,17 @@
     const mastered = progress.currentGame.foundIds.length;
     const remaining = countries.length - mastered;
     document.getElementById('mastered-count').textContent = mastered;
+    document.getElementById('total-count').textContent = `/ ${countries.length}`;
+    document.getElementById('progress-track').setAttribute('aria-valuemax', countries.length);
     document.getElementById('score').textContent = progress.currentGame.score;
     document.getElementById('streak').textContent = progress.currentGame.streak;
     document.getElementById('progress-ring').style.background = `conic-gradient(var(--teal) ${mastered / countries.length * 100}%, #e9ede6 0%)`;
     document.getElementById('progress-fill').style.width = `${mastered / countries.length * 100}%`;
     document.getElementById('progress-track').setAttribute('aria-valuenow', mastered);
     document.getElementById('progress-caption').textContent = remaining === 0
-      ? `Partie terminée : ${mastered} pays trouvés, ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}.`
+      ? `Partie terminée : ${words.count(mastered)} ${words.found(mastered)}, ${progress.currentGame.errors} erreur${progress.currentGame.errors > 1 ? 's' : ''}.`
       : mastered === 0 && progress.currentGame.errors === 0 ? 'Ton voyage commence ici.'
-      : `${remaining} pays encore à trouver.`;
+      : `${words.count(remaining)} encore à trouver.`;
     document.getElementById('random-button').disabled = remaining === 0;
     updateEmptyHint();
 
@@ -570,8 +700,8 @@
       const missedCountry = !masteredCountry && progress.currentGame.missedIds.includes(country.id);
       for (const node of nodes.get(country.id) || []) {
         node.setAttribute('aria-label', masteredCountry
-          ? `${country.name}, déjà trouvé dans cette partie.`
-          : `Zone de pays à identifier, numéro ${countries.findIndex(item => item.id === country.id) + 1}`);
+          ? `${fullName(country)}, déjà ${words.found(1)} dans cette partie.`
+          : anonymousLabel(country.id));
         node.setAttribute('aria-disabled', String(masteredCountry));
         node.classList.toggle('mastered', masteredCountry);
         node.classList.toggle('missed', missedCountry);
@@ -581,6 +711,12 @@
         node.classList.toggle('pin-missed', missedCountry);
         node.classList.toggle('pin-selected', country.id === selectedId);
       }
+    }
+    const codesEverywhere = !askingCode();
+    for (const text of codeLabels) {
+      const id = text.dataset.country;
+      text.classList.toggle('hidden-label', !codesEverywhere && !hasFound(id));
+      text.classList.toggle('selected-label', id === selectedId);
     }
   }
 
@@ -653,6 +789,14 @@
     freeAnswerInput.disabled = false;
     freeAnswerSubmit.disabled = false;
     document.getElementById('question-number').textContent = `${String(countries.findIndex(country => country.id === id) + 1).padStart(2, '0')} / ${countries.length}`;
+    questionAsk = askingCode() ? 'code' : 'name';
+    document.getElementById('quiz-title').textContent = questionAsk === 'code'
+      ? `${words.which} est le numéro de ${words.this} ?` : `${words.which} est ${words.this} ?`;
+    document.getElementById('quiz-hint').textContent = questionAsk === 'code'
+      ? `C'est ${nameInSentence(correct)}.` : `${words.feminine ? 'La' : 'Le'} ${words.one} ${words.feminine ? 'sélectionnée' : 'sélectionné'} est ${words.feminine ? 'surlignée' : 'surligné'} sur la carte.`;
+    document.getElementById('free-answer-label').textContent = questionAsk === 'code' ? 'Numéro' : `Nom ${/^[aeiouyé]/i.test(words.one) ? "de l'" : words.feminine ? 'de la ' : 'du '}${words.one}`;
+    freeAnswerInput.placeholder = questionAsk === 'code' ? 'Écris le numéro' : `Écris le nom ${/^[aeiouyé]/i.test(words.one) ? "de l'" : words.feminine ? 'de la ' : 'du '}${words.one}`;
+    freeAnswerInput.inputMode = questionAsk === 'code' ? 'numeric' : 'text';
     if (questionMode === 'qcm') {
       const choices = qcmChoices(id);
       for (const [index, choice] of choices.entries()) {
@@ -663,7 +807,7 @@
         const marker = document.createElement('span');
         marker.className = 'answer-index';
         marker.textContent = String.fromCharCode(65 + index);
-        button.append(marker, document.createTextNode(choice.name));
+        button.append(marker, document.createTextNode(questionAsk === 'code' ? choice.label : choice.name));
         button.addEventListener('click', () => submitAnswer(choice.id));
         answers.append(button);
       }
@@ -697,7 +841,7 @@
       progress.currentGame.foundIds.push(selectedId);
       progress.currentGame.score += 10;
       progress.currentGame.streak++;
-      feedback.textContent = `Bien joué ! C'est ${nameInSentence(country)}.`;
+      feedback.textContent = `Bien joué ! C'est ${fullInSentence(country)}.`;
       feedback.classList.add('good');
     } else {
       stat.wrongAttempts++;
@@ -705,12 +849,13 @@
       progress.currentGame.streak = 0;
       if (!progress.currentGame.missedIds.includes(selectedId)) progress.currentGame.missedIds.push(selectedId);
       feedback.textContent = timedOut
-        ? `Temps écoulé : c'est ${nameInSentence(country)}. Tu peux réessayer !`
-        : `Pas tout à fait : c'est ${nameInSentence(country)}. Tu peux réessayer !`;
+        ? `Temps écoulé : c'est ${fullInSentence(country)}. Tu peux réessayer !`
+        : `Pas tout à fait : c'est ${fullInSentence(country)}. Tu peux réessayer !`;
       feedback.classList.add('bad');
     }
     progress.stats[selectedId] = stat;
     const event = { countryId: selectedId, chosenId, correct, at, mode: questionMode };
+    if (questionAsk === 'code') event.ask = 'code';
     if (enteredText !== null) event.enteredText = enteredText;
     if (timedOut) event.timedOut = true;
     progress.history.push(event);
@@ -728,15 +873,15 @@
     freeAnswerSubmit.disabled = true;
     nextButton.hidden = false;
     updateUI();
-    document.getElementById('next-button-label').textContent = isGameComplete() ? 'Voir le bilan' : 'Un autre pays';
-    document.getElementById('result-cta-label').textContent = isGameComplete() ? 'Voir le bilan' : 'Un autre pays';
+    document.getElementById('next-button-label').textContent = isGameComplete() ? 'Voir le bilan' : words.another;
+    document.getElementById('result-cta-label').textContent = isGameComplete() ? 'Voir le bilan' : words.another;
     resultDialog.dataset.result = correct ? 'good' : 'bad';
     document.getElementById('result-icon').textContent = correct ? '✓' : '×';
     document.getElementById('result-kicker').textContent = correct ? 'Bonne réponse' : 'Mauvaise réponse';
     document.getElementById('result-title').textContent = correct ? 'Bravo !' : timedOut ? 'Temps écoulé !' : 'À réviser !';
     document.getElementById('result-detail').textContent = correct
-      ? `Tu as reconnu ${nameInSentence(country)}.`
-      : `La bonne réponse était ${nameInSentence(country)}.`;
+      ? `Tu as reconnu ${fullInSentence(country)}.`
+      : `La bonne réponse était ${fullInSentence(country)}.`;
     resultDialog.showModal();
     resultAdvance.focus();
   }
@@ -790,6 +935,7 @@
   }
 
   function renderMap() {
+    if (!map) return;
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
     const mapUnitsPerPixel = map.width / width;
@@ -799,6 +945,9 @@
       group.querySelector('.pin-halo')?.setAttribute('r', (5 * pinVisualScale * mapUnitsPerPixel).toFixed(2));
       group.querySelector('.pin-core')?.setAttribute('r', (2 * pinVisualScale * mapUnitsPerPixel).toFixed(2));
     }
+    // Department numbers keep a readable size on screen and hide when the map is too small for them.
+    svg.style.setProperty('--label-size', `${(11 * mapUnitsPerPixel).toFixed(2)}px`);
+    svg.classList.toggle('labels-crowded', width < (level.labelMinWidth || 0));
     const extent = map.contextExtent;
     const leftLimit = viewport.clientWidth - (viewport.clientWidth - width) / 2 - extent.right / map.width * width;
     const rightLimit = -(viewport.clientWidth - width) / 2 - extent.left / map.width * width;
@@ -830,12 +979,8 @@
   }
 
   function focusCountry(id) {
-    const pin = map.pins.find(item => item.id === id);
-    const shape = nodes.get(id).find(node => node.tagName.toLowerCase() === 'path');
-    const box = shape.getBBox();
-    const x = pin ? pin.x : box.x + box.width / 2;
-    const y = pin ? pin.y : box.y + box.height / 2;
-    zoom = 1.55;
+    const { x, y } = zoneCenter(id);
+    zoom = level.focusZoom || 1.55;
     const width = fittedWidth() * zoom;
     const height = width * map.height / map.width;
     panX = width * (0.5 - x / map.width);
@@ -851,6 +996,207 @@
   function touchDistance(first, second) {
     return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
   }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = () => { script.remove(); reject(new Error(`Impossible de charger ${src}`)); };
+      document.head.append(script);
+    });
+  }
+
+  // Catalog entries, with the data file of each level that is ready (Europe always is).
+  function levelEntries() {
+    const listed = Array.isArray(window.GEO_LEVEL_LIST) ? window.GEO_LEVEL_LIST.filter(item => item && item.id && item.file) : [];
+    const entries = levelCatalog.map(entry => ({ ...entry, file: entry.file || listed.find(item => item.id === entry.id)?.file || null }));
+    for (const item of listed) {
+      if (!entries.some(entry => entry.id === item.id)) {
+        entries.push({ id: item.id, group: item.group || 'Autres', title: item.title || item.id, noun: 'zone', file: item.file });
+      }
+    }
+    return entries;
+  }
+
+  function europeLevel(raw) {
+    return {
+      width: raw.width, height: raw.height, contextExtent: raw.contextExtent,
+      context: raw.context, lines: [], overlay: [], insets: [], pins: raw.pins, neighbors: landNeighbors,
+      attribution: 'Contours : Natural Earth',
+      footnote: 'Les frontières et la définition de l’Europe peuvent varier selon les sources. Les pays transcontinentaux et le Kosovo sont inclus dans ce jeu.',
+      countries: raw.countries.map(country => ({ ...country, type: 'area', aliases: countryAliases[country.id] || [] }))
+    };
+  }
+
+  const pathOf = item => typeof item === 'string' ? item : item?.d;
+  function normalizeLevel(data) {
+    const zones = Array.isArray(data.zones) ? [...data.zones] : [];
+    // Rivers given as named lines are playable line zones.
+    for (const line of data.lines || []) if (line && typeof line === 'object' && line.id && line.name) zones.push({ ...line, type: 'line' });
+    const width = Number(data.width) || 1000;
+    const height = Number(data.height) || 1000;
+    return {
+      width, height,
+      contextExtent: data.contextExtent || { left: 0, top: 0, right: width, bottom: height },
+      context: (data.context || []).map(pathOf).filter(Boolean),
+      lines: (data.lines || []).filter(line => !(line && typeof line === 'object' && line.id && line.name)).map(pathOf).filter(Boolean),
+      overlay: (data.overlay || []).map(pathOf).filter(Boolean),
+      insets: (data.insets || []).filter(inset => [inset.x, inset.y, inset.w, inset.h].every(Number.isFinite)),
+      pins: (data.pins || []).filter(pin => pin && Number.isFinite(pin.x) && Number.isFinite(pin.y)),
+      neighbors: data.neighbors && typeof data.neighbors === 'object' ? data.neighbors : {},
+      attribution: data.attribution || '',
+      footnote: data.footnote || '',
+      countries: zones.filter(zone => zone && zone.id != null && zone.name && zone.d).map(zone => ({
+        id: String(zone.id), name: zone.name, inSentence: zone.inSentence || null, d: zone.d,
+        type: zone.type === 'line' ? 'line' : 'area', kind: zone.kind || null,
+        label: zone.label != null && zone.label !== '' ? String(zone.label) : null,
+        labelX: zone.labelX, labelY: zone.labelY,
+        dInset: zone.dInset || null, insetLabelX: zone.insetLabelX, insetLabelY: zone.insetLabelY,
+        aliases: Array.isArray(zone.aliases) ? zone.aliases : []
+      }))
+    };
+  }
+
+  async function loadLevelData(entry) {
+    if (entry.id === 'europe') {
+      if (!window.EUROPE_MAP) await loadScript(entry.file);
+      return europeLevel(window.EUROPE_MAP);
+    }
+    if (!window.GEO_LEVELS?.[entry.id]) await loadScript(entry.file);
+    const data = window.GEO_LEVELS?.[entry.id];
+    if (!data) throw new Error(`Niveau ${entry.id} absent du fichier ${entry.file}`);
+    return normalizeLevel(data);
+  }
+
+  const capitalize = text => text[0].toUpperCase() + text.slice(1);
+  function applyLevelTexts() {
+    document.title = `${level.title} — Géographie à la carte`;
+    document.getElementById('level-group').textContent = level.group;
+    document.getElementById('level-title').textContent = level.title;
+    document.getElementById('map-question').textContent = `${words.which} est ${words.this} ?`;
+    document.getElementById('map-instruction').textContent = `Clique sur ${words.feminine ? 'une' : 'un'} ${words.one}. Glisse pour déplacer la carte ; zoome avec la molette, deux doigts ou +/−.`;
+    document.getElementById('random-label').textContent = `Choisir ${words.feminine ? 'une' : 'un'} ${words.one} au hasard`;
+    document.getElementById('map-credit').textContent = map.attribution;
+    document.getElementById('history-col-name').textContent = capitalize(words.one);
+    const footnote = document.getElementById('footnote');
+    footnote.textContent = map.footnote;
+    footnote.hidden = !map.footnote;
+  }
+
+  function applyLevel(entry, data) {
+    if (!question.hidden) closeQuestion();
+    if (resultDialog.open) resultDialog.close();
+    hideCountryTooltip();
+    level = { ...entry, focusZoom: entry.focusZoom || 1.55 };
+    words = makeWords(nouns[entry.noun] || nouns.zone);
+    map = data;
+    countries = data.countries;
+    countryById = new Map(countries.map(country => [country.id, country]));
+    neighbors = data.neighbors;
+    legacyCountry = entry.id === 'europe' ? europeLegacyCountry : null;
+    storageKey = entry.id === 'europe' ? 'atlas-club-europe-v1' : `atlas-club-level-${entry.id}-v1`;
+    levelHasCodes = countries.some(country => country.label);
+    level.labelMinWidth = levelHasCodes ? 560 : 0;
+    lastRandomId = null;
+    progress = loadProgress();
+    applyLevelTexts();
+    buildMap();
+    updateSettingsInfo();
+    renderLevelMenu();
+    try { localStorage.setItem(levelKey, entry.id); } catch (_) { /* Optional preference. */ }
+  }
+
+  let levelLoading = false;
+  async function selectLevel(id) {
+    const entry = levelEntries().find(item => item.id === id && item.file);
+    if (!entry || levelLoading) return false;
+    if (level?.id === id) return true;
+    levelLoading = true;
+    levelButton.setAttribute('aria-busy', 'true');
+    try {
+      applyLevel(entry, await loadLevelData(entry));
+      return true;
+    } catch (error) {
+      console.warn(error);
+      document.getElementById('level-status').textContent = `Ce niveau n'a pas pu se charger. Vérifie ta connexion et réessaie.`;
+      return false;
+    } finally {
+      levelLoading = false;
+      levelButton.removeAttribute('aria-busy');
+    }
+  }
+
+  const levelButton = document.getElementById('level-button');
+  const levelMenu = document.getElementById('level-menu');
+  function renderLevelMenu() {
+    const groups = new Map();
+    for (const entry of levelEntries()) {
+      if (!groups.has(entry.group)) groups.set(entry.group, []);
+      groups.get(entry.group).push(entry);
+    }
+    const children = [];
+    for (const [group, entries] of groups) {
+      const heading = document.createElement('p');
+      heading.className = 'level-menu-group';
+      heading.textContent = group;
+      children.push(heading);
+      for (const entry of entries) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'level-option';
+        button.dataset.level = entry.id;
+        button.disabled = !entry.file;
+        if (entry.id === level?.id) button.setAttribute('aria-current', 'true');
+        const name = document.createElement('span');
+        name.textContent = entry.title;
+        const note = document.createElement('small');
+        note.textContent = !entry.file ? 'bientôt' : entry.id === level?.id ? 'en cours' : '';
+        button.append(name, note);
+        button.addEventListener('click', async () => {
+          if (await selectLevel(entry.id)) closeLevelMenu(true);
+        });
+        children.push(button);
+      }
+    }
+    const status = document.createElement('p');
+    status.className = 'level-status';
+    status.id = 'level-status';
+    status.setAttribute('role', 'status');
+    children.push(status);
+    levelMenu.replaceChildren(...children);
+  }
+  function openLevelMenu() {
+    pauseQuestionTimer();
+    renderLevelMenu();
+    levelMenu.hidden = false;
+    levelButton.setAttribute('aria-expanded', 'true');
+    (levelMenu.querySelector('[aria-current="true"]') || levelMenu.querySelector('button:not(:disabled)'))?.focus();
+  }
+  function closeLevelMenu(returnFocus = false) {
+    if (levelMenu.hidden) return;
+    levelMenu.hidden = true;
+    levelButton.setAttribute('aria-expanded', 'false');
+    if (returnFocus) levelButton.focus();
+    resumeQuestionTimer();
+  }
+  levelButton.addEventListener('click', () => (levelMenu.hidden ? openLevelMenu() : closeLevelMenu()));
+  levelMenu.addEventListener('keydown', event => {
+    const options = [...levelMenu.querySelectorAll('button:not(:disabled)')];
+    const index = options.indexOf(document.activeElement);
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeLevelMenu(true); }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      options[(index + step + options.length) % options.length]?.focus();
+    }
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!levelMenu.hidden && !event.target.closest('.level-picker')) closeLevelMenu();
+  });
+  levelMenu.addEventListener('focusout', event => {
+    if (!levelMenu.hidden && event.relatedTarget && !event.relatedTarget.closest('.level-picker')) closeLevelMenu();
+  });
 
   document.getElementById('random-button').addEventListener('click', randomQuestion);
   document.getElementById('settings-button').addEventListener('click', () => {
@@ -869,6 +1215,7 @@
   settingsDialog.addEventListener('change', event => {
     if (event.target.name === 'answer-mode') settings.answerMode = event.target.value;
     if (event.target.name === 'country-selection') settings.countrySelection = event.target.value;
+    if (event.target.name === 'ask') { settings.ask = event.target.value; updateUI(); }
     if (event.target === timedModeInput) {
       settings.timedMode = timedModeInput.checked;
       timerSetting.hidden = !settings.timedMode;
@@ -893,12 +1240,12 @@
     event.preventDefault();
     const enteredText = freeAnswerInput.value.trim();
     if (!enteredText) {
-      feedback.textContent = 'Écris un nom de pays avant de valider.';
+      feedback.textContent = questionAsk === 'code' ? 'Écris un numéro avant de valider.' : 'Écris un nom avant de valider.';
       feedback.className = 'feedback info';
       freeAnswerInput.focus();
       return;
     }
-    submitAnswer(matchTypedCountry(enteredText), enteredText);
+    submitAnswer(questionAsk === 'code' ? matchTypedCode(enteredText) : matchTypedCountry(enteredText), enteredText);
   });
   document.getElementById('close-modal').addEventListener('click', closeQuestion);
   nextButton.addEventListener('click', nextQuestion);
@@ -909,7 +1256,7 @@
     nextButton.focus();
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !settingsDialog.open && !historyDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
+    if (event.key === 'Escape' && levelMenu.hidden && !settingsDialog.open && !historyDialog.open && !resultDialog.open && !question.hidden) closeQuestion();
   });
   document.getElementById('reset-button').addEventListener('click', () => {
     if (!window.confirm('Commencer une nouvelle partie ? Ton score et les pays trouvés seront remis à zéro. Ton historique et tes statistiques d’erreurs seront conservés.')) return;
@@ -1006,5 +1353,13 @@
   });
   viewport.addEventListener('touchcancel', () => { pinch = null; touchPan = null; suppressClick = false; });
 
-  buildMap();
+  async function boot() {
+    new ResizeObserver(renderMap).observe(viewport);
+    let saved = null;
+    try { saved = localStorage.getItem(levelKey); } catch (_) { /* Default level. */ }
+    const wanted = new URLSearchParams(location.search).get('niveau') || saved || 'europe';
+    if (!(await selectLevel(wanted)) && wanted !== 'europe') await selectLevel('europe');
+    renderLevelMenu();
+  }
+  boot();
 })();
