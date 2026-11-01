@@ -8,7 +8,7 @@
     { id: 'france-departements', group: 'France', title: 'Les départements', noun: 'departement' },
     { id: 'france-fleuves', group: 'France', title: 'Les fleuves et rivières', noun: 'coursDEau' },
     { id: 'europe', group: 'Europe', title: "Les pays d'Europe", noun: 'pays', file: 'map-data.js?v=20261011-small-markers' },
-    { id: 'monde-continents', group: 'Monde', title: 'Les continents', noun: 'continent' },
+    { id: 'monde-continents', group: 'Monde', title: 'Les continents', noun: 'continent', focusZoom: 1 },
     { id: 'monde-afrique', group: 'Monde', title: "Pays d'Afrique", noun: 'pays' },
     { id: 'monde-amerique-nord', group: 'Monde', title: "Pays d'Amérique du Nord", noun: 'pays' },
     { id: 'monde-amerique-sud', group: 'Monde', title: "Pays d'Amérique du Sud", noun: 'pays' },
