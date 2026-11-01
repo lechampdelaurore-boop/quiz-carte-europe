@@ -14,9 +14,10 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="description" content="Un jeu pour apprendre la géographie sur une carte interactive : pays, régions, départements, fleuves et continents.">
   <title>Géographie à la carte</title>
-  <link rel="stylesheet" href="styles.css?v=20261101-kawaii">
+  <link rel="stylesheet" href="styles.css?v=20261101-recompenses">
   <script defer src="data/index.js"></script>
-  <script defer src="app.js?v=20261101-kawaii"></script>
+  <script defer src="creatures.js?v=20261101-30"></script>
+  <script defer src="app.js?v=20261101-recompenses"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -132,6 +133,7 @@
       <span class="result-kicker" id="result-kicker">Bonne réponse</span>
       <strong class="result-title" id="result-title">Bravo !</strong>
       <span class="result-detail" id="result-detail"></span>
+      <span class="result-buddy" id="result-buddy" aria-hidden="true" hidden><span class="result-bubble" id="result-bubble" hidden></span><svg viewBox="0 0 100 100" id="result-buddy-art"></svg></span>
       <span class="result-cta"><span id="result-cta-label">Suivant</span> <span aria-hidden="true">→</span></span>
     </button>
   </dialog>

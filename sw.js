@@ -1,11 +1,12 @@
 // Garde le jeu disponible hors ligne et permet de l'installer sur un téléphone.
 // Changer CACHE à chaque mise à jour des fichiers du jeu.
-var CACHE = 'quiz-carte-europe-v2';
+var CACHE = 'quiz-carte-europe-v3';
 var FONTS = 'quiz-carte-europe-polices';
 var FILES = [
   './',
   './index.html',
   './app.js',
+  './creatures.js',
   './styles.css',
   './fonts/fredoka-latin.woff2',
   './fonts/nunito-latin.woff2',
