@@ -891,6 +891,88 @@
       : `La bonne réponse était ${fullInSentence(country)}.`;
     resultDialog.showModal();
     resultAdvance.focus();
+    if (correct) celebrate(isGameComplete()); else hideCreature();
+  }
+
+  // Récompenses, comme dans les tables : étoiles, une des 30 créatures kawaii (jamais après une erreur),
+  // une bulle aux séries de 3, 5, 10, 15… et des confettis pour une série de 10 ou une partie terminée.
+  const cheers = ['Trop fort !', 'Quelle série !', 'Champion !', 'Incroyable !'];
+  let creatureBag = [];
+  let lastCreature = null;
+  function nextCreature() {
+    const all = window.KAWAII?.CREATURES || [];
+    if (!all.length) return null;
+    if (!creatureBag.length) {
+      creatureBag = shuffle(all);
+      if (creatureBag[0] === lastCreature && creatureBag.length > 1) creatureBag.push(creatureBag.shift());
+    }
+    lastCreature = creatureBag.shift();
+    return lastCreature;
+  }
+  function hideCreature() {
+    document.getElementById('result-buddy').hidden = true;
+  }
+  function celebrate(complete) {
+    const buddy = document.getElementById('result-buddy');
+    const bubble = document.getElementById('result-bubble');
+    const creature = settings.motion ? nextCreature() : null;
+    if (!creature) { hideCreature(); return; }
+    const streak = progress.currentGame.streak;
+    const milestone = streak === 3 || streak === 5 || (streak >= 10 && streak % 5 === 0);
+    document.getElementById('result-buddy-art').innerHTML =
+      `<g stroke="${window.KAWAII.INK}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">${creature[1]}</g>`;
+    bubble.textContent = complete ? 'Atlas complet !' : milestone ? `${streak} d'affilée ! ${cheers[Math.floor(Math.random() * cheers.length)]}` : '';
+    bubble.hidden = !bubble.textContent;
+    buddy.hidden = false;
+    buddy.classList.remove('on');
+    void buddy.offsetWidth;
+    buddy.classList.add('on');
+    starBurst();
+    if (complete || (milestone && streak % 10 === 0)) confetti();
+  }
+  const motionAllowed = () => settings.motion && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function starBurst() {
+    if (!motionAllowed()) return;
+    const box = document.createElement('span');
+    box.className = 'burst';
+    box.setAttribute('aria-hidden', 'true');
+    const colors = ['var(--sun)', 'var(--sun)', 'var(--good)', 'var(--v-rose)'];
+    for (let i = 0; i < 14; i++) {
+      const star = document.createElement('i');
+      const angle = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
+      const distance = 110 + Math.random() * 70;
+      star.textContent = '★';
+      star.style.setProperty('--c', colors[i % colors.length]);
+      star.style.setProperty('--s', `${18 + Math.random() * 16}px`);
+      star.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+      star.style.setProperty('--y', `${Math.sin(angle) * distance * 0.8}px`);
+      star.style.setProperty('--r', `${Math.random() * 360 - 180}deg`);
+      box.append(star);
+    }
+    const plus = document.createElement('b');
+    plus.textContent = '+10';
+    box.append(plus);
+    resultAdvance.append(box);
+    setTimeout(() => box.remove(), 1000);
+  }
+  function confetti() {
+    if (!motionAllowed()) return;
+    const layer = document.createElement('div');
+    layer.className = 'confetti';
+    layer.setAttribute('aria-hidden', 'true');
+    const colors = ['var(--v-rose)', 'var(--v-soleil)', 'var(--v-menthe)', 'var(--v-lilas)', 'var(--v-ciel)', 'var(--v-peche)'];
+    for (let i = 0; i < 70; i++) {
+      const piece = document.createElement('i');
+      piece.style.left = `${Math.random() * 100}%`;
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDuration = `${1.6 + Math.random() * 1.4}s`;
+      piece.style.animationDelay = `${Math.random() * 0.4}s`;
+      piece.style.setProperty('--dx', `${Math.random() * 120 - 60}px`);
+      piece.style.setProperty('--r', `${Math.random() * 720 - 360}deg`);
+      layer.append(piece);
+    }
+    resultDialog.append(layer);
+    setTimeout(() => layer.remove(), 3400);
   }
 
   function closeQuestion() {

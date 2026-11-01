@@ -518,11 +518,30 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .result-detail { margin-top: 8px; font-size: 1.05rem; font-weight: 700; }
 .result-cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; min-height: 52px; padding: 8px 22px; border: var(--bord) solid var(--line); border-radius: var(--r-btn); background: var(--action); color: var(--on-action); box-shadow: var(--ombre); font: 600 1.15rem var(--display); }
 .result-sparkles { display: none; }
-.result-dialog[data-result="good"] .result-sparkles { display: block; }
+
 .result-sparkles i { position: absolute; top: 40%; left: 50%; color: var(--sun); font-style: normal; font-size: 28px; -webkit-text-stroke: 1.5px var(--line); animation: etoile 1s ease-out both; }
 .result-sparkles i:nth-child(1) { --dx: -120px; --dy: -110px; }
 .result-sparkles i:nth-child(2) { --dx: 110px; --dy: -120px; animation-delay: .1s; }
 .result-sparkles i:nth-child(3) { --dx: 20px; --dy: -150px; font-size: 20px; animation-delay: .2s; }
+/* Récompense : une créature kawaii arrive en bas à droite de la carte de résultat (comme dans les tables) */
+.result-buddy { position: absolute; right: -16px; bottom: -46px; width: 118px; height: 118px; z-index: 5; pointer-events: none; opacity: 0; transform: translateY(24px) scale(.5); transform-origin: 50% 100%; transition: opacity .2s, transform .45s var(--ressort) .35s; }
+.result-buddy.on { opacity: 1; transform: none; }
+.result-buddy svg { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 90%; }
+.result-buddy.on svg { animation: hop .8s .7s ease-in-out 2; }
+@keyframes hop { 30% { transform: translateY(-14px) rotate(-6deg); } 60% { transform: rotate(4deg); } }
+.result-bubble { position: absolute; right: 104px; bottom: 60px; padding: 6px 12px; white-space: nowrap; background: #FFFFFF; color: #2B2340; border: 3px solid #2B2340; border-radius: 16px; box-shadow: 0 4px 0 #2B2340; font: 700 1.05rem var(--display); }
+.result-bubble::after { content: ''; position: absolute; right: -9px; bottom: 6px; width: 12px; height: 12px; background: #FFFFFF; border: solid #2B2340; border-width: 3px 3px 0 0; transform: rotate(45deg); }
+.result-dialog[data-result="good"] .result-advance:has(.result-buddy:not([hidden])) { padding-bottom: 76px; }
+.burst { position: absolute; left: 50%; top: 38%; width: 0; height: 0; pointer-events: none; z-index: 4; }
+.burst i { position: absolute; left: 0; top: 0; font-style: normal; font-size: var(--s, 22px); color: var(--c, var(--sun)); -webkit-text-stroke: 1.5px #2B2340; animation: burst .9s ease-out forwards; }
+@keyframes burst { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } 70% { opacity: 1; } to { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)); opacity: 0; } }
+.burst b { position: absolute; left: 0; top: 0; font: 700 2rem var(--display); color: var(--good); -webkit-text-stroke: 1.5px #2B2340; animation: plus .9s ease-out forwards; }
+@keyframes plus { from { transform: translate(-50%, -20%) scale(.5); opacity: 0; } 25% { transform: translate(-50%, -80%) scale(1.15); opacity: 1; } to { transform: translate(-50%, -260%); opacity: 0; } }
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+.confetti i { position: absolute; top: -16px; width: 10px; height: 14px; border: 1.5px solid #2B2340; border-radius: 3px; animation: fall linear forwards; }
+@keyframes fall { to { transform: translate(var(--dx), 110vh) rotate(var(--r)); } }
+.calme .result-buddy { transition: none; }
+@media (prefers-reduced-motion: reduce) { .result-buddy { transition: none; transform: none; } }
 .footnote { flex: none; margin: 4px 4px 10px; color: var(--muted); font-size: .72rem; }
 
 /* Téléphone et tablette */
