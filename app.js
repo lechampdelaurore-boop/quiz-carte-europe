@@ -21,7 +21,9 @@
     departement: { one: 'département', many: 'départements', feminine: false },
     coursDEau: { one: "cours d'eau", many: "cours d'eau", feminine: false },
     continent: { one: 'continent', many: 'continents', feminine: false },
-    zone: { one: 'zone', many: 'zones', feminine: true }
+    zone: { one: 'zone', many: 'zones', feminine: true },
+    fleuve: { one: 'fleuve', many: 'fleuves', feminine: false },
+    riviere: { one: 'rivière', many: 'rivières', feminine: true }
   };
   // French wording for the current level's kind of zone ("ce pays", "cette région", "trouvées"...).
   function makeWords(noun) {
@@ -38,6 +40,8 @@
   }
   let level = null;
   let words = makeWords(nouns.pays);
+  // Wording for one zone: a river level says « ce fleuve » or « cette rivière » rather than « ce cours d'eau ».
+  const wordsFor = country => country?.kind && nouns[country.kind] ? makeWords(nouns[country.kind]) : words;
   let map = null;
   let countries = [];
   let countryById = new Map();
@@ -131,6 +135,7 @@
   const resultAdvance = document.getElementById('result-advance');
   const nodes = new Map();
   const pinGroups = [];
+  const mouthMarkers = [];
   const codeLabels = [];
   let levelHasCodes = false;
   const askingCode = () => levelHasCodes && settings.ask === 'code';
@@ -585,10 +590,14 @@
     svg.append(decorLayer(map.lines, 'decor-line'));
 
     const countryLayer = element('g');
-    for (const country of countries) {
+    // Rivers first, so that a river reaching a fleuve tucks under its double line.
+    const drawOrder = [...countries].sort((a, b) => (a.kind === 'fleuve') - (b.kind === 'fleuve'));
+    for (const country of drawOrder) {
       if (country.type === 'line') {
-        const group = element('g', { class: 'country country-line', 'data-country': country.id });
+        const group = element('g', { class: `country country-line${country.kind ? ` kind-${country.kind}` : ''}`, 'data-country': country.id });
         group.append(element('path', { d: country.d, class: 'line-hit' }), element('path', { d: country.d, class: 'line-casing' }), element('path', { d: country.d, class: 'line-stroke' }));
+        // A fleuve is drawn as a double line (light core), kept when it is selected or found.
+        if (country.kind === 'fleuve') group.append(element('path', { d: country.d, class: 'line-core' }));
         registerCountry(group, country.id);
         countryLayer.append(group);
       } else {
@@ -605,6 +614,25 @@
     }
     svg.append(countryLayer);
     svg.append(decorLayer(map.overlay, 'overlay-line'));
+
+    // Mouths: where a fleuve reaches the sea (round badge with waves). Garonne and Dordogne share the Gironde.
+    mouthMarkers.length = 0;
+    const mouthLayer = element('g', { 'aria-hidden': 'true', class: 'mouth-layer' });
+    const mouths = [];
+    for (const country of countries) {
+      if (!Number.isFinite(country.mouthX) || !Number.isFinite(country.mouthY)) continue;
+      const near = mouths.find(m => Math.hypot(m.x - country.mouthX, m.y - country.mouthY) < 20);
+      if (near) { near.x = (near.x + country.mouthX) / 2; near.y = (near.y + country.mouthY) / 2; } else mouths.push({ x: country.mouthX, y: country.mouthY });
+    }
+    for (const mouth of mouths) {
+      const marker = element('g', { class: 'mouth-marker' });
+      marker.append(element('circle', { r: 9, class: 'mouth-badge' }), element('path', { d: 'M-5 -1.5q2.5-3 5 0t5 0M-5 3q2.5-3 5 0t5 0', class: 'mouth-waves' }));
+      marker.dataset.x = mouth.x;
+      marker.dataset.y = mouth.y;
+      mouthMarkers.push(marker);
+      mouthLayer.append(marker);
+    }
+    svg.append(mouthLayer);
 
     const labelLayer = element('g', { 'aria-hidden': 'true', class: 'code-labels' });
     for (const country of countries) {
@@ -768,12 +796,13 @@
     freeAnswerSubmit.disabled = false;
     document.getElementById('question-number').textContent = `${String(countries.findIndex(country => country.id === id) + 1).padStart(2, '0')} / ${countries.length}`;
     questionAsk = askingCode() ? 'code' : 'name';
+    const w = wordsFor(correct);
     document.getElementById('quiz-title').textContent = questionAsk === 'code'
-      ? `${words.which} est le numéro de ${words.this} ?` : `${words.which} est ${words.this} ?`;
+      ? `${w.which} est le numéro de ${w.this} ?` : `${w.which} est ${w.this} ?`;
     document.getElementById('quiz-hint').textContent = questionAsk === 'code'
-      ? `C'est ${nameInSentence(correct)}.` : `${words.feminine ? 'La' : 'Le'} ${words.one} ${words.feminine ? 'sélectionnée' : 'sélectionné'} est ${words.feminine ? 'surlignée' : 'surligné'} sur la carte.`;
-    document.getElementById('free-answer-label').textContent = questionAsk === 'code' ? 'Numéro' : `Nom ${/^[aeiouyé]/i.test(words.one) ? "de l'" : words.feminine ? 'de la ' : 'du '}${words.one}`;
-    freeAnswerInput.placeholder = questionAsk === 'code' ? 'Écris le numéro' : `Écris le nom ${/^[aeiouyé]/i.test(words.one) ? "de l'" : words.feminine ? 'de la ' : 'du '}${words.one}`;
+      ? `C'est ${nameInSentence(correct)}.` : `${w.feminine ? 'La' : 'Le'} ${w.one} ${w.feminine ? 'sélectionnée' : 'sélectionné'} est ${w.feminine ? 'surlignée' : 'surligné'} sur la carte.`;
+    document.getElementById('free-answer-label').textContent = questionAsk === 'code' ? 'Numéro' : `Nom ${/^[aeiouyé]/i.test(w.one) ? "de l'" : w.feminine ? 'de la ' : 'du '}${w.one}`;
+    freeAnswerInput.placeholder = questionAsk === 'code' ? 'Écris le numéro' : `Écris le nom ${/^[aeiouyé]/i.test(w.one) ? "de l'" : w.feminine ? 'de la ' : 'du '}${w.one}`;
     freeAnswerInput.inputMode = questionAsk === 'code' ? 'numeric' : 'text';
     if (questionMode === 'qcm') {
       const choices = qcmChoices(id);
@@ -1011,6 +1040,7 @@
     const height = width * map.height / map.width;
     const mapUnitsPerPixel = map.width / width;
     const pinVisualScale = window.matchMedia('(min-width: 851px)').matches ? 1.5 : 1;
+    for (const marker of mouthMarkers) marker.setAttribute('transform', `translate(${marker.dataset.x} ${marker.dataset.y}) scale(${((pinVisualScale > 1 ? 1.2 : 1) * mapUnitsPerPixel).toFixed(3)})`);
     for (const group of pinGroups) {
       group.querySelector('.pin-hit').setAttribute('r', (18 * mapUnitsPerPixel).toFixed(2));
       group.querySelector('.pin-halo')?.setAttribute('r', (5 * pinVisualScale * mapUnitsPerPixel).toFixed(2));
@@ -1195,6 +1225,7 @@
         label: zone.label != null && zone.label !== '' ? String(zone.label) : null,
         labelX: zone.labelX, labelY: zone.labelY,
         dInset: zone.dInset || null, insetLabelX: zone.insetLabelX, insetLabelY: zone.insetLabelY,
+        mouthX: zone.mouthX, mouthY: zone.mouthY,
         aliases: Array.isArray(zone.aliases) ? zone.aliases : []
       }))
     };
@@ -1220,6 +1251,7 @@
     document.getElementById('map-instruction').textContent = `Clique sur ${words.feminine ? 'une' : 'un'} ${words.one}. Glisse pour déplacer la carte ; zoome avec la molette, deux doigts ou +/−.`;
     document.getElementById('random-label').textContent = `${words.feminine ? 'Une' : 'Un'} ${words.one} au hasard`;
     document.getElementById('map-credit').textContent = map.attribution;
+    document.getElementById('river-legend').hidden = !countries.some(country => country.kind === 'fleuve');
     document.getElementById('history-col-name').textContent = capitalize(words.one);
     const footnote = document.getElementById('footnote');
     footnote.textContent = map.footnote;
