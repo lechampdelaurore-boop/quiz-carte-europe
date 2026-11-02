@@ -14,10 +14,10 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="description" content="Un jeu pour apprendre la géographie sur une carte interactive : pays, régions, départements, fleuves et continents.">
   <title>Géographie à la carte</title>
-  <link rel="stylesheet" href="styles.css?v=20261101-zoom-anime">
+  <link rel="stylesheet" href="styles.css?v=20261102-fleuves">
   <script defer src="data/index.js"></script>
   <script defer src="creatures.js?v=20261101-30"></script>
-  <script defer src="app.js?v=20261101-zoom-anime"></script>
+  <script defer src="app.js?v=20261102-fleuves"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -50,7 +50,7 @@
             <svg id="europe-map" viewBox="0 0 1000 930" role="group" aria-label="Carte interactive"></svg>
             <div class="map-tooltip" id="map-tooltip" role="status" aria-live="polite" hidden></div>
           </div>
-          <div class="map-footer"><span><i class="legend-dot unplayed"></i> À jouer</span><span><i class="legend-dot played"></i> Trouvé</span><span><i class="legend-dot missed"></i> À retenter</span><span class="map-credit" id="map-credit"></span></div>
+          <div class="map-footer"><span><i class="legend-dot unplayed"></i> À jouer</span><span><i class="legend-dot played"></i> Trouvé</span><span><i class="legend-dot missed"></i> À retenter</span><span class="river-legend" id="river-legend" hidden><span><svg class="legend-line" viewBox="0 0 32 12" aria-hidden="true"><path d="M4 6H28" class="legend-fleuve-casing"/><path d="M4 6H28" class="legend-fleuve-stroke"/><path d="M4 6H28" class="legend-fleuve-core"/></svg> Fleuve</span><span><svg class="legend-line" viewBox="0 0 32 12" aria-hidden="true"><path d="M4 6H28" class="legend-riviere-casing"/><path d="M4 6H28" class="legend-riviere-stroke"/></svg> Rivière</span><span><svg class="legend-line legend-mouth" viewBox="-10 -10 20 20" aria-hidden="true"><circle r="9" class="mouth-badge"/><path d="M-5 -1.5q2.5-3 5 0t5 0M-5 3q2.5-3 5 0t5 0" class="mouth-waves"/></svg> Embouchure (arrivée à la mer)</span></span><span class="map-credit" id="map-credit"></span></div>
         </div>
 
         <div class="side-column">

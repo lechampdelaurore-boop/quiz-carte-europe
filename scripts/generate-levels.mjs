@@ -467,6 +467,13 @@ const RIVERS = [
   { id: 'durance', name: 'Durance', inSentence: 'la Durance', kind: 'riviere', ne: ['Durance'] },
   { id: 'vienne', name: 'Vienne', inSentence: 'la Vienne', kind: 'riviere', ne: ['Vienne'] }
 ];
+// Embouchure (lon, lat) des fleuves : là où ils arrivent à la mer. Le point est ensuite posé sur l'extrémité de tracé la plus proche.
+// Garonne et Dordogne se rejoignent au bec d'Ambès pour former l'estuaire de la Gironde : même point.
+const RIVER_MOUTHS = {
+  seine: [0.2, 49.44], loire: [-2.2, 47.27], garonne: [-0.55, 45.04], rhone: [4.85, 43.33],
+  rhin: [4.1, 51.95], dordogne: [-0.55, 45.04], meuse: [4.05, 51.85], escaut: [3.6, 51.42],
+  somme: [1.6, 50.19], charente: [-1.1, 45.96], adour: [-1.52, 43.53], vilaine: [-2.5, 47.5]
+};
 const RIVER_AREA = { west: -6, east: 12, south: 41, north: 53 };
 const FLEUVES_BOX = { x: 10, y: 10, w: 980, h: 960 };
 
@@ -516,7 +523,17 @@ function buildFranceFleuves() {
       if (step >= half) { const t = half / step; label = [longest[i - 1][0] + t * (longest[i][0] - longest[i - 1][0]), longest[i - 1][1] + t * (longest[i][1] - longest[i - 1][1])]; break; }
       half -= step;
     }
-    return { id: river.id, name: river.name, inSentence: river.inSentence, type: 'line', kind: river.kind, d: projected.map(linePath).join(''), labelX: +label[0].toFixed(1), labelY: +label[1].toFixed(1) };
+    const zone = { id: river.id, name: river.name, inSentence: river.inSentence, type: 'line', kind: river.kind, d: projected.map(linePath).join(''), labelX: +label[0].toFixed(1), labelY: +label[1].toFixed(1) };
+    if (river.kind === 'fleuve') {
+      if (!RIVER_MOUTHS[river.id]) throw new Error('Embouchure manquante : ' + river.name);
+      const target = metro(RIVER_MOUTHS[river.id]);
+      const dist = p => Math.hypot(p[0] - target[0], p[1] - target[1]);
+      const mouth = projected.flatMap(l => [l[0], l[l.length - 1]]).reduce((best, p) => dist(p) < dist(best) ? p : best);
+      if (dist(mouth) > 60) throw new Error('Embouchure loin du tracé : ' + river.name + ' (' + dist(mouth).toFixed(1) + ')');
+      zone.mouthX = +mouth[0].toFixed(1);
+      zone.mouthY = +mouth[1].toFixed(1);
+    }
+    return zone;
   });
   // Voisins : cours d'eau qui se rejoignent (extrémité d'un tronçon à moins de 3 unités de l'autre cours d'eau).
   const neighbors = Object.fromEntries(RIVERS.map(r => [r.id, new Set()]));

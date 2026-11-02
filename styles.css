@@ -285,6 +285,9 @@ h2 { font-size: 1.4rem; }
   --zone-hover: #EEE8FF;
   --zone-line: #2B2340;
   --river: #3E8EDB;
+  --fleuve: #2F6BE0;        /* fleuve : double trait bleu… */
+  --fleuve-core: #CFE8FF;   /* …avec un centre clair */
+  --riviere: #2BA8A0;       /* rivière : simple trait vert-bleu */
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -296,6 +299,9 @@ h2 { font-size: 1.4rem; }
     --zone-hover: #4A3F7A;
     --zone-line: #0E0B1A;
     --river: #7FC0FF;
+    --fleuve: #5E95FF;
+    --fleuve-core: #E3F0FF;
+    --riviere: #4FD1C5;
   }
 }
 
@@ -374,6 +380,36 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .country-line.missed .line-stroke { stroke: var(--retry); }
 .country-line.selected .line-casing { stroke-width: 11px; }
 .country-line.selected .line-stroke { stroke: var(--sun); stroke-width: 7px; }
+/* Fleuves (double trait) et rivières (simple trait) : la forme reste la même sélectionnée, trouvée ou ratée. */
+.kind-fleuve .line-casing { stroke-width: 10px; }
+.kind-fleuve .line-stroke { stroke: var(--fleuve); stroke-width: 7px; }
+.line-core { fill: none; stroke: var(--fleuve-core); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; transition: stroke .2s; }
+.kind-riviere .line-casing { stroke-width: 5.5px; }
+.kind-riviere .line-stroke { stroke: var(--riviere); stroke-width: 3px; }
+.kind-fleuve:hover .line-casing, .kind-fleuve:focus-visible .line-casing { stroke-width: 12px; }
+.kind-fleuve:hover .line-stroke, .kind-fleuve:focus-visible .line-stroke { stroke-width: 9px; }
+.kind-riviere:hover .line-casing, .kind-riviere:focus-visible .line-casing { stroke-width: 7.5px; }
+.kind-riviere:hover .line-stroke, .kind-riviere:focus-visible .line-stroke { stroke-width: 5px; }
+.country-line.mastered .line-stroke { stroke: var(--good); }
+.country-line.mastered .line-core { stroke: var(--tint-good); }
+.country-line.missed .line-stroke { stroke: var(--retry); }
+.country-line.missed .line-core { stroke: var(--tint-retry); }
+.kind-fleuve.selected .line-casing { stroke-width: 14px; }
+.kind-fleuve.selected .line-stroke { stroke: var(--sun); stroke-width: 10px; }
+.kind-fleuve.selected .line-core { stroke: var(--zone-line); stroke-width: 2.5px; }
+.kind-riviere.selected .line-casing { stroke-width: 9px; }
+.kind-riviere.selected .line-stroke { stroke: var(--sun); stroke-width: 5.5px; }
+.mouth-layer { pointer-events: none; }
+.mouth-badge { fill: var(--sun); stroke: var(--line); stroke-width: 2; }
+.mouth-waves { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-linecap: round; }
+.legend-line { width: 32px; height: 12px; overflow: visible; }
+.legend-line path { fill: none; stroke-linecap: round; }
+.legend-mouth { width: 18px; height: 18px; }
+.legend-fleuve-casing { stroke: var(--zone-line); stroke-width: 10px; }
+.legend-fleuve-stroke { stroke: var(--fleuve); stroke-width: 7px; }
+.legend-fleuve-core { stroke: var(--fleuve-core); stroke-width: 2px; }
+.legend-riviere-casing { stroke: var(--zone-line); stroke-width: 5.5px; }
+.legend-riviere-stroke { stroke: var(--riviere); stroke-width: 3px; }
 .decor-line { fill: none; stroke: var(--land-line); stroke-width: 1.5px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .overlay-line { fill: none; stroke: var(--zone-line); stroke-width: 2.6px; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
 .inset-frame { fill: var(--sea); stroke: var(--zone-line); stroke-width: 2px; vector-effect: non-scaling-stroke; }
@@ -392,7 +428,8 @@ main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .pin-group:focus-visible .pin-hit { stroke: var(--sun); stroke-width: 3; vector-effect: non-scaling-stroke; }
 
 .map-footer { flex: none; display: flex; align-items: center; gap: 8px 12px; padding: 8px 16px; border-top: var(--bord) solid var(--line); color: var(--muted); font-size: .72rem; }
-.map-footer > span:not(.map-credit) { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 800; color: var(--ink); }
+.map-footer > span:not(.map-credit), .river-legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 800; color: var(--ink); }
+.map-footer > span.river-legend { display: contents; }
 .legend-dot { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line); border-radius: 50%; }
 .legend-dot.unplayed { background: var(--zone); }
 .legend-dot.played { background: conic-gradient(var(--p-rose) 0 33%, var(--p-menthe) 0 66%, var(--p-lilas) 0); }
