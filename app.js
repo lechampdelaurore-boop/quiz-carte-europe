@@ -523,7 +523,7 @@
         return;
       }
       hideCountryTooltip();
-      openQuestion(targetId);
+      openQuestion(targetId, true);
     });
     node.addEventListener('pointerenter', event => {
       if (event.pointerType !== 'touch' && !pointerDrag?.moved) {
@@ -551,7 +551,7 @@
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         hideCountryTooltip();
-        openQuestion(id);
+        openQuestion(id, true);
       }
     });
     if (!nodes.has(id)) nodes.set(id, []);
@@ -777,7 +777,9 @@
     resumeQuestionTimer();
   }
 
-  function openQuestion(id) {
+  // fromMap : la zone a été choisie en touchant la carte. On ne bouge alors pas la carte (pas de zoom animé) :
+  // l'enfant voit déjà la zone. Le zoom automatique sert à l'enchaînement « au hasard » / « Un autre pays ».
+  function openQuestion(id, fromMap = false) {
     if (!countryById.has(id) || hasFound(id) || isGameComplete()) return;
     hideCountryTooltip();
     previousFocus = document.activeElement;
@@ -825,7 +827,7 @@
     gameLayout.classList.add('en-question');
     startQuestionTimer();
     fitMapToQuestion();
-    if (autoZoom.checked) focusCountry(id);
+    if (autoZoom.checked && !fromMap) focusCountry(id);
     updateUI();
     if (questionMode === 'open') freeAnswerInput.focus();
     else answers.querySelector('button')?.focus();
