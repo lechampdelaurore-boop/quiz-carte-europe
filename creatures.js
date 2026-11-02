@@ -1,4 +1,4 @@
-// Les 30 personnages kawaii validés pour les applis de Marc (copie de personnages/creatures.js du projet,
+// Les 30 personnages kawaii validés pour les applis (copie de personnages/creatures.js du projet,
 // identique à tables-en-cartes). Ne pas les redessiner ici : modifier la source commune puis recopier.
 // Expose window.KAWAII = { INK, CREATURES } où CREATURES est un tableau de [nom, contenu SVG 100 × 100].
 window.KAWAII = (function () {
